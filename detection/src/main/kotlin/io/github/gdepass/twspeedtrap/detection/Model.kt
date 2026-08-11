@@ -75,5 +75,7 @@ sealed interface AlertEvent {
         val section: Section,
         val averageKmh: Int,
         val overLimit: Boolean,
+        /** True when the exit was inferred from a fix past the gantry (GPS gap); average includes the overshoot. */
+        val estimated: Boolean = false,
     ) : AlertEvent
 }
