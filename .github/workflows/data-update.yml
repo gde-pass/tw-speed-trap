@@ -19,8 +19,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
 
       - name: Run pipeline
+        # --project (not --directory): keep the repo root as cwd so the
+        # output, geojson, assets and fallback-db paths all resolve correctly.
         run: |
-          uv run --directory pipeline build-db \
+          uv run --project pipeline build-db \
             --out pipeline/out \
             --geojson data/cameras.geojson \
             --assets-db app/src/main/assets/cameras.db
