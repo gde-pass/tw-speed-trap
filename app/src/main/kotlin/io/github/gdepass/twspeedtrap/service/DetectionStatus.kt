@@ -16,6 +16,8 @@ object DetectionStatus {
         val cameraCount: Int = 0,
         /** The selected TTS language has no installed voice. */
         val voiceMissing: Boolean = false,
+        /** Android location services were switched off while detection runs. */
+        val locationOff: Boolean = false,
     )
 
     private val _state = MutableStateFlow(UiState())

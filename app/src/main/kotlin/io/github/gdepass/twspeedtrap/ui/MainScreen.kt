@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -62,17 +63,7 @@ fun MainScreen(
         permissionRefresh++
         onPauseOrDispose {}
     }
-    val fineGranted = remember(permissionRefresh) { context.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) }
-    val backgroundGranted =
-        remember(permissionRefresh) { context.hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) }
-    val notificationsGranted =
-        remember(permissionRefresh) {
-            Build.VERSION.SDK_INT < 33 || context.hasPermission(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    val batteryExempt =
-        remember(permissionRefresh) {
-            context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
-        }
+    val checks = remember(permissionRefresh) { SystemChecks.read(context) }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionRefresh++ }
 
@@ -93,10 +84,7 @@ fun MainScreen(
             Spacer(Modifier.height(24.dp))
 
             PermissionChecklist(
-                fineGranted = fineGranted,
-                backgroundGranted = backgroundGranted,
-                notificationsGranted = notificationsGranted,
-                batteryExempt = batteryExempt,
+                checks = checks,
                 onRequestPermission = { permissionLauncher.launch(it) },
                 onRequestBatteryExemption = {
                     context.startActivity(
@@ -106,10 +94,13 @@ fun MainScreen(
                         ),
                     )
                 },
+                onOpenLocationSettings = {
+                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                },
             )
 
             Spacer(Modifier.weight(1f))
-            StartStopButton(running = state.running, enabled = fineGranted) {
+            StartStopButton(running = state.running, enabled = checks.fineGranted) {
                 val intent = Intent(context, DetectionService::class.java)
                 if (state.running) {
                     intent.action = DetectionService.ACTION_STOP
@@ -125,14 +116,12 @@ fun MainScreen(
 
 @Composable
 private fun PermissionChecklist(
-    fineGranted: Boolean,
-    backgroundGranted: Boolean,
-    notificationsGranted: Boolean,
-    batteryExempt: Boolean,
+    checks: SystemChecks,
     onRequestPermission: (String) -> Unit,
     onRequestBatteryExemption: () -> Unit,
+    onOpenLocationSettings: () -> Unit,
 ) {
-    if (!fineGranted) {
+    if (!checks.fineGranted) {
         PermissionCard(
             title = stringResource(R.string.perm_location_title),
             body = stringResource(R.string.perm_location_body),
@@ -140,27 +129,59 @@ private fun PermissionChecklist(
         ) { onRequestPermission(Manifest.permission.ACCESS_FINE_LOCATION) }
         return
     }
-    if (!backgroundGranted) {
+    if (!checks.locationEnabled) {
+        PermissionCard(
+            title = stringResource(R.string.perm_gps_off_title),
+            body = stringResource(R.string.perm_gps_off_body),
+            buttonLabel = stringResource(R.string.perm_gps_off_enable),
+            onClick = onOpenLocationSettings,
+        )
+    }
+    if (!checks.backgroundGranted) {
         PermissionCard(
             title = stringResource(R.string.perm_background_title),
             body = stringResource(R.string.perm_background_body),
             buttonLabel = stringResource(R.string.perm_background_grant),
         ) { onRequestPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) }
     }
-    if (!notificationsGranted) {
+    if (!checks.notificationsGranted) {
         PermissionCard(
             title = stringResource(R.string.perm_notifications_title),
             body = stringResource(R.string.perm_notifications_body),
             buttonLabel = stringResource(R.string.perm_notifications_grant),
         ) { onRequestPermission(Manifest.permission.POST_NOTIFICATIONS) }
     }
-    if (!batteryExempt) {
+    if (!checks.batteryExempt) {
         PermissionCard(
             title = stringResource(R.string.perm_battery_title),
             body = stringResource(R.string.perm_battery_body),
             buttonLabel = stringResource(R.string.perm_battery_grant),
             onClick = onRequestBatteryExemption,
         )
+    }
+}
+
+/** Everything that must be true before alerts can actually fire. */
+private data class SystemChecks(
+    val fineGranted: Boolean,
+    val backgroundGranted: Boolean,
+    val notificationsGranted: Boolean,
+    val batteryExempt: Boolean,
+    val locationEnabled: Boolean,
+) {
+    companion object {
+        fun read(context: Context): SystemChecks =
+            SystemChecks(
+                fineGranted = context.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION),
+                backgroundGranted = context.hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                notificationsGranted =
+                    Build.VERSION.SDK_INT < 33 || context.hasPermission(Manifest.permission.POST_NOTIFICATIONS),
+                batteryExempt =
+                    context
+                        .getSystemService(PowerManager::class.java)
+                        .isIgnoringBatteryOptimizations(context.packageName),
+                locationEnabled = context.getSystemService(LocationManager::class.java).isLocationEnabled,
+            )
     }
 }
 
@@ -179,11 +200,17 @@ private fun StatusRow(
             text =
                 when {
                     !state.running -> ""
+                    state.locationOff -> stringResource(R.string.gps_disabled_warning)
                     state.accuracyM == null -> stringResource(R.string.gps_waiting)
                     else -> stringResource(R.string.gps_accuracy, state.accuracyM)
                 },
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color =
+                if (state.locationOff) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (state.running) {

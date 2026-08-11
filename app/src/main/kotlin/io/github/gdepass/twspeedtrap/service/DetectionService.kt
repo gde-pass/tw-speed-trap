@@ -4,12 +4,16 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.location.LocationManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import io.github.gdepass.twspeedtrap.MainActivity
@@ -33,6 +37,7 @@ class DetectionService : LifecycleService() {
     private var chimeEnabled = true
     private lateinit var localized: Context
     private var stationarySinceMs: Long? = null
+    private var locationMonitor: BroadcastReceiver? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -83,6 +88,7 @@ class DetectionService : LifecycleService() {
                     withContext(Dispatchers.IO) { repository.loadCameras() to repository.loadSections() }
                 val engine = AlertEngine(cameras, settings.toEngineConfig(), sections)
                 DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
+                watchLocationServices()
 
                 LocationSource(this@DetectionService).fixes().collect { fix ->
                     if (settings.autoStopEnabled && stationaryTooLong(fix.speedMps, fix.timestampMs)) {
@@ -152,6 +158,8 @@ class DetectionService : LifecycleService() {
         detectionJob?.cancel()
         detectionJob = null
         stationarySinceMs = null
+        locationMonitor?.let(::unregisterReceiver)
+        locationMonitor = null
         announcer?.release()
         announcer = null
         DetectionStatus.reset()
@@ -161,9 +169,47 @@ class DetectionService : LifecycleService() {
 
     override fun onDestroy() {
         detectionJob?.cancel()
+        locationMonitor?.let(::unregisterReceiver)
+        locationMonitor = null
         announcer?.release()
         DetectionStatus.reset()
         super.onDestroy()
+    }
+
+    /** GPS silently off = the most dangerous state: the app looks alive but
+     * can never alert. Watch the system toggle, tell the rider both ways. */
+    private fun watchLocationServices() {
+        if (locationMonitor != null) return
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(
+                    context: Context?,
+                    intent: Intent?,
+                ) = onLocationServicesChanged()
+            }
+        locationMonitor = receiver
+        ContextCompat.registerReceiver(
+            this,
+            receiver,
+            IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onLocationServicesChanged()
+    }
+
+    private fun onLocationServicesChanged() {
+        val enabled = getSystemService(LocationManager::class.java).isLocationEnabled
+        val wasOff = DetectionStatus.state.value.locationOff
+        if (!enabled && !wasOff) {
+            Log.w(TAG, "location services turned off while detecting")
+            DetectionStatus.update { it.copy(locationOff = true) }
+            announcer?.speak(localized.getString(R.string.alert_location_off), chimeEnabled)
+            getSystemService(NotificationManager::class.java)
+                .notify(NOTIFICATION_ID, buildNotification(localized.getString(R.string.notif_location_off)))
+        } else if (enabled && wasOff) {
+            DetectionStatus.update { it.copy(locationOff = false) }
+            announcer?.speak(localized.getString(R.string.alert_location_on), chimeEnabled)
+        }
     }
 
     private fun createNotificationChannel() {

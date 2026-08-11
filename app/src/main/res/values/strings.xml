@@ -10,6 +10,7 @@
     <string name="next_camera">Camera in %1$d m</string>
     <string name="next_camera_limit">Camera in %1$d m · limit %2$d</string>
     <string name="gps_waiting">Waiting for GPS…</string>
+    <string name="gps_disabled_warning">GPS off — no alerts!</string>
     <string name="gps_accuracy">GPS ±%1$d m</string>
     <string name="cameras_loaded">%1$d cameras</string>
 
@@ -26,6 +27,9 @@
     <string name="perm_battery_title">Battery optimisation</string>
     <string name="perm_battery_body">Android silently kills GPS apps when the screen is off unless they are exempted. This is the number-one cause of missed alerts.</string>
     <string name="perm_battery_grant">Disable optimisation</string>
+    <string name="perm_gps_off_title">Location is off</string>
+    <string name="perm_gps_off_body">Android location services are disabled. Detection cannot receive GPS, so no alert can fire.</string>
+    <string name="perm_gps_off_enable">Enable location</string>
 
     <!-- Foreground service notification -->
     <string name="notif_channel_name">Detection status</string>
@@ -41,6 +45,8 @@
     <string name="alert_red_light_camera">Red-light camera, %1$d metres</string>
     <string name="alert_tech_enforcement">Tech enforcement, %1$d metres</string>
     <string name="alert_mobile_camera">Mobile camera, %1$d metres</string>
+    <string name="alert_location_off">Location turned off, alerts disabled</string>
+    <string name="alert_location_on">Location restored</string>
     <string name="alert_with_warning">%1$s. Slow down!</string>
     <string name="alert_section_entered">Average speed zone, limit %1$d</string>
     <string name="alert_section_over">Average too high, slow down!</string>
@@ -62,6 +68,9 @@
     <string name="notif_autostart_channel">Auto-start</string>
     <string name="notif_autostart_title">Bluetooth connected</string>
     <string name="notif_autostart_text">Tap to start detection</string>
+    <string name="notif_location_off">Location off — no alerts</string>
+    <string name="settings_bt_permission_missing">Bluetooth permission missing — auto-start cannot work.</string>
+    <string name="settings_bt_permission_grant">Grant Bluetooth permission</string>
     <string name="settings_camera_types">Announced camera types</string>
     <string name="type_fixed">Fixed cameras</string>
     <string name="type_mobile">Mobile enforcement spots</string>

@@ -39,10 +39,13 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Non-exported is enough: system broadcasts always reach it. -->
+        <!-- Must be exported: the Bluetooth stack broadcasts from its own
+             UID (not system), and Android drops broadcasts to non-exported
+             receivers from foreign UIDs. Safe because ACL_CONNECTED is a
+             protected broadcast — third-party apps cannot send it. -->
         <receiver
             android:name=".service.BluetoothAutoStartReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
             </intent-filter>

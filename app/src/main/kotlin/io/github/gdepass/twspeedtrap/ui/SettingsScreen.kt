@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.data.AppSettings
@@ -126,19 +127,7 @@ fun SettingsScreen(
             SwitchRow(stringResource(R.string.settings_auto_stop), settings.autoStopEnabled) {
                 scope.launch { repository.setAutoStopEnabled(it) }
             }
-            // Receiving Bluetooth connect broadcasts needs BLUETOOTH_CONNECT
-            // from API 31; the toggle stays on even if denied — the user can
-            // grant it later from system settings.
-            val bluetoothPermission =
-                rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-            SwitchRow(stringResource(R.string.settings_auto_start_bt), settings.autoStartBluetoothEnabled) { enabled ->
-                if (enabled &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                    context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) !=
-                    PackageManager.PERMISSION_GRANTED
-                ) {
-                    bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                }
+            BluetoothAutoStartSetting(settings.autoStartBluetoothEnabled) { enabled ->
                 scope.launch { repository.setAutoStartBluetoothEnabled(enabled) }
             }
 
@@ -262,6 +251,44 @@ private fun LanguageOption(
         RadioButton(selected = currentTag == tag, onClick = { onSelect(tag) })
         Spacer(Modifier.width(8.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/** Toggle plus its BLUETOOTH_CONNECT permission handling: requested when
+ * enabling on API 31+, and a visible warning while the toggle is on but the
+ * permission is missing — without it the connect broadcast never arrives. */
+@Composable
+private fun BluetoothAutoStartSetting(
+    enabled: Boolean,
+    onSetEnabled: (Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    LifecycleResumeEffect(Unit) {
+        refresh++
+        onPauseOrDispose {}
+    }
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+
+    fun permissionMissing() =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+
+    SwitchRow(stringResource(R.string.settings_auto_start_bt), enabled) { on ->
+        if (on && permissionMissing()) launcher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        onSetEnabled(on)
+    }
+    val warn = remember(refresh, enabled) { enabled && permissionMissing() }
+    if (warn) {
+        Text(
+            stringResource(R.string.settings_bt_permission_missing),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Button(onClick = { launcher.launch(Manifest.permission.BLUETOOTH_CONNECT) }) {
+            Text(stringResource(R.string.settings_bt_permission_grant))
+        }
     }
 }
 

@@ -8,6 +8,7 @@
     <string name="next_camera">Radar à %1$d m</string>
     <string name="next_camera_limit">Radar à %1$d m · limite %2$d</string>
     <string name="gps_waiting">En attente du GPS…</string>
+    <string name="gps_disabled_warning">GPS coupé — aucune alerte !</string>
     <string name="gps_accuracy">GPS ±%1$d m</string>
     <string name="cameras_loaded">%1$d radars</string>
 
@@ -24,6 +25,9 @@
     <string name="perm_battery_title">Optimisation de la batterie</string>
     <string name="perm_battery_body">Android coupe silencieusement le GPS des applis écran éteint, sauf exemption. C’est la cause n°1 des alertes manquées.</string>
     <string name="perm_battery_grant">Désactiver l’optimisation</string>
+    <string name="perm_gps_off_title">Localisation désactivée</string>
+    <string name="perm_gps_off_body">Les services de localisation Android sont désactivés. La détection ne reçoit pas le GPS, aucune alerte ne peut fonctionner.</string>
+    <string name="perm_gps_off_enable">Activer la localisation</string>
 
     <!-- Foreground service notification -->
     <string name="notif_channel_name">État de la détection</string>
@@ -39,6 +43,8 @@
     <string name="alert_red_light_camera">Radar de feu rouge, %1$d mètres</string>
     <string name="alert_tech_enforcement">Contrôle technologique, %1$d mètres</string>
     <string name="alert_mobile_camera">Radar mobile, %1$d mètres</string>
+    <string name="alert_location_off">Localisation désactivée, alertes coupées</string>
+    <string name="alert_location_on">Localisation rétablie</string>
     <string name="alert_with_warning">%1$s. Ralentissez !</string>
     <string name="alert_section_entered">Zone à vitesse moyenne, limite %1$d</string>
     <string name="alert_section_over">Moyenne trop élevée, ralentissez !</string>
@@ -60,6 +66,9 @@
     <string name="notif_autostart_channel">Démarrage automatique</string>
     <string name="notif_autostart_title">Bluetooth connecté</string>
     <string name="notif_autostart_text">Touchez pour démarrer la détection</string>
+    <string name="notif_location_off">Localisation désactivée — aucune alerte</string>
+    <string name="settings_bt_permission_missing">Permission Bluetooth manquante — le démarrage automatique ne peut pas fonctionner.</string>
+    <string name="settings_bt_permission_grant">Accorder la permission Bluetooth</string>
     <string name="settings_camera_types">Types de radars annoncés</string>
     <string name="type_fixed">Radars fixes</string>
     <string name="type_mobile">Contrôles mobiles</string>
