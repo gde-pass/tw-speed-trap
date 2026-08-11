@@ -40,16 +40,28 @@ _session = requests.Session()
 _session.mount("https://", _RelaxedStrictnessAdapter())
 
 
+# Some .gov.tw hosts (tgos.tw in particular) reject unfamiliar user agents /
+# cloud-runner traffic with 403; a browser-like identity gets through.
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+
+
 def _get(url: str) -> requests.Response:
     last_error: Exception | None = None
     for attempt in range(RETRIES):
-        try:
-            resp = _session.get(url, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT_S)
-            resp.raise_for_status()
-            return resp
-        except Exception as e:  # noqa: BLE001 - retry on any transport error
-            last_error = e
-            time.sleep(2**attempt)
+        for headers in (
+            {"User-Agent": USER_AGENT},
+            {"User-Agent": BROWSER_UA, "Referer": "https://data.gov.tw/"},
+        ):
+            try:
+                resp = _session.get(url, headers=headers, timeout=TIMEOUT_S)
+                resp.raise_for_status()
+                return resp
+            except Exception as e:  # noqa: BLE001 - retry on any transport error
+                last_error = e
+        time.sleep(2**attempt)
     raise FetchError(f"failed to fetch {url}: {last_error}")
 
 
