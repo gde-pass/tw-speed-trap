@@ -14,6 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # A tag that doesn't match appVersion would ship an APK whose
+      # versionCode/versionName lie about the release (v1.1.0 shipped as
+      # 1.0.0 once) — installed apps then silently refuse the update.
+      - name: Verify tag matches appVersion
+        run: |
+          app_version=$(sed -n 's/^val appVersion = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          if [ "v$app_version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME != appVersion $app_version — bump appVersion in app/build.gradle.kts"
+            exit 1
+          fi
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

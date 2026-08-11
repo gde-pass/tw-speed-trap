@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Single source of truth for the app version. Bump this before tagging
+// vX.Y.Z — the release workflow refuses tags that don't match it.
+val appVersion = "1.1.0"
+
 android {
     namespace = "io.github.gdepass.twspeedtrap"
     compileSdk = 37
@@ -12,8 +16,13 @@ android {
         applicationId = "io.github.gdepass.twspeedtrap"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        // Derived so versionCode can never lag behind the released version
+        // (1.1.0 -> 10100). Android refuses updates whose code isn't higher.
+        versionCode =
+            appVersion.split(".").let { (major, minor, patch) ->
+                major.toInt() * 10_000 + minor.toInt() * 100 + patch.toInt()
+            }
+        versionName = appVersion
     }
 
     // Signing comes exclusively from the environment (CI secrets or a local
