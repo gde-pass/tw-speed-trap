@@ -19,6 +19,7 @@ import java.util.Locale
 class Announcer(
     private val context: Context,
     private val locale: Locale,
+    private val onVoiceStatus: (voiceMissing: Boolean) -> Unit = {},
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
 
@@ -58,6 +59,7 @@ class Announcer(
     private fun onInitialized() {
         val result = tts.setLanguage(locale)
         voiceMissing = result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED
+        onVoiceStatus(voiceMissing)
         tts.setAudioAttributes(attributes)
         tts.addEarcon(EARCON_CHIME, context.packageName, R.raw.chime)
         tts.setOnUtteranceProgressListener(

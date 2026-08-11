@@ -14,6 +14,8 @@ object DetectionStatus {
         val nextCameraDistanceM: Int? = null,
         val nextCameraLimitKmh: Int? = null,
         val cameraCount: Int = 0,
+        /** The selected TTS language has no installed voice. */
+        val voiceMissing: Boolean = false,
     )
 
     private val _state = MutableStateFlow(UiState())

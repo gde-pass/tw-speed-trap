@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.gdepass.twspeedtrap.detection.CameraType
@@ -19,6 +20,8 @@ data class AppSettings(
     val speedToleranceKmh: Int = 10,
     val chimeEnabled: Boolean = true,
     val enabledTypes: Set<CameraType> = CameraType.entries.toSet(),
+    /** BCP-47 tag ("fr", "en") or [io.github.gdepass.twspeedtrap.util.LocaleOverride.SYSTEM]. */
+    val languageTag: String = "system",
 ) {
     fun toEngineConfig(): EngineConfig =
         EngineConfig(
@@ -42,6 +45,7 @@ class SettingsRepository(
                         ?.mapNotNull { name -> CameraType.entries.find { it.name == name } }
                         ?.toSet()
                         ?: DEFAULTS.enabledTypes,
+                languageTag = prefs[KEY_LANGUAGE] ?: DEFAULTS.languageTag,
             )
         }
 
@@ -54,11 +58,14 @@ class SettingsRepository(
     suspend fun setEnabledTypes(types: Set<CameraType>) =
         context.dataStore.edit { prefs -> prefs[KEY_ENABLED_TYPES] = types.map { it.name }.toSet() }
 
+    suspend fun setLanguageTag(tag: String) = context.dataStore.edit { it[KEY_LANGUAGE] = tag }
+
     companion object {
         private val DEFAULTS = AppSettings()
         private val KEY_DISTANCE_MULTIPLIER = doublePreferencesKey("distance_multiplier")
         private val KEY_SPEED_TOLERANCE = intPreferencesKey("speed_tolerance_kmh")
         private val KEY_CHIME = booleanPreferencesKey("chime_enabled")
         private val KEY_ENABLED_TYPES = stringSetPreferencesKey("enabled_types")
+        private val KEY_LANGUAGE = stringPreferencesKey("language_tag")
     }
 }

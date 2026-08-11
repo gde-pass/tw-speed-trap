@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.util.Log
@@ -17,6 +18,7 @@ import io.github.gdepass.twspeedtrap.data.CameraRepository
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.detection.AlertEngine
 import io.github.gdepass.twspeedtrap.detection.AlertEvent
+import io.github.gdepass.twspeedtrap.util.LocaleOverride
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -28,9 +30,11 @@ class DetectionService : LifecycleService() {
     private var detectionJob: Job? = null
     private var announcer: Announcer? = null
     private var chimeEnabled = true
+    private lateinit var localized: Context
 
     override fun onCreate() {
         super.onCreate()
+        localized = this
         createNotificationChannel()
     }
 
@@ -60,12 +64,18 @@ class DetectionService : LifecycleService() {
             buildNotification(getString(R.string.notif_starting)),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
-        announcer = Announcer(this, resources.configuration.locales[0])
 
         detectionJob =
             lifecycleScope.launch {
                 val settings = SettingsRepository(applicationContext).settings.first()
                 chimeEnabled = settings.chimeEnabled
+                // Spoken alerts and notification text follow the app language.
+                localized = LocaleOverride.wrap(this@DetectionService, settings.languageTag)
+                announcer =
+                    Announcer(
+                        this@DetectionService,
+                        LocaleOverride.resolve(this@DetectionService, settings.languageTag),
+                    ) { missing -> DetectionStatus.update { it.copy(voiceMissing = missing) } }
                 val cameras = withContext(Dispatchers.IO) { CameraRepository(this@DetectionService).loadCameras() }
                 val engine = AlertEngine(cameras, settings.toEngineConfig())
                 DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
@@ -94,12 +104,12 @@ class DetectionService : LifecycleService() {
                 val limit = event.camera.speedLimitKmh
                 var text =
                     if (limit != null) {
-                        getString(R.string.alert_fixed_camera_limit, distance, limit)
+                        localized.getString(R.string.alert_fixed_camera_limit, distance, limit)
                     } else {
-                        getString(R.string.alert_fixed_camera, distance)
+                        localized.getString(R.string.alert_fixed_camera, distance)
                     }
                 if (event.overLimit) {
-                    text = getString(R.string.alert_with_warning, text)
+                    text = localized.getString(R.string.alert_with_warning, text)
                 }
                 Log.i(TAG, "alert: $text (${event.camera.id} at ${event.distanceM.roundToInt()} m)")
                 announcer?.speak(text, chimeEnabled)
@@ -167,9 +177,9 @@ class DetectionService : LifecycleService() {
     ) {
         val text =
             if (cameraDistanceM != null) {
-                getString(R.string.notif_speed_camera, speedKmh, cameraDistanceM)
+                localized.getString(R.string.notif_speed_camera, speedKmh, cameraDistanceM)
             } else {
-                getString(R.string.notif_speed, speedKmh)
+                localized.getString(R.string.notif_speed, speedKmh)
             }
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
     }

@@ -37,4 +37,27 @@
     <string name="alert_fixed_camera">Radar fixe, %1$d mètres</string>
     <string name="alert_fixed_camera_limit">Radar fixe, %1$d mètres, limite %2$d</string>
     <string name="alert_with_warning">%1$s. Ralentissez !</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Réglages</string>
+    <string name="back">Retour</string>
+    <string name="settings_language">Langue</string>
+    <string name="language_system">Langue du système</string>
+    <string name="language_french">Français</string>
+    <string name="language_english">English</string>
+    <string name="settings_alerts">Alertes</string>
+    <string name="settings_chime">Carillon avant les annonces</string>
+    <string name="settings_lead_time">Préavis d’alerte : %1$d s avant le radar</string>
+    <string name="settings_tolerance">Tolérance de vitesse : +%1$d km/h</string>
+    <string name="settings_camera_types">Types de radars annoncés</string>
+    <string name="type_fixed">Radars fixes</string>
+    <string name="type_mobile">Contrôles mobiles</string>
+    <string name="type_red_light">Radars de feu rouge</string>
+    <string name="type_section">Radars tronçons</string>
+    <string name="type_tech">Contrôle technologique</string>
+    <string name="type_other">Autres</string>
+    <string name="settings_voice">Voix</string>
+    <string name="voice_missing_warning">Aucune voix n’est installée pour la langue choisie. Les alertes peuvent être muettes.</string>
+    <string name="voice_install">Installer les données de voix</string>
+    <string name="voice_open_tts_settings">Ouvrir les réglages de synthèse vocale</string>
 </resources>
