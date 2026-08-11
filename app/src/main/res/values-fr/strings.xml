@@ -36,6 +36,9 @@
     <!-- Spoken alerts: short and unambiguous at speed -->
     <string name="alert_fixed_camera">Radar fixe, %1$d mètres</string>
     <string name="alert_fixed_camera_limit">Radar fixe, %1$d mètres, limite %2$d</string>
+    <string name="alert_red_light_camera">Radar de feu rouge, %1$d mètres</string>
+    <string name="alert_tech_enforcement">Contrôle technologique, %1$d mètres</string>
+    <string name="alert_mobile_camera">Radar mobile, %1$d mètres</string>
     <string name="alert_with_warning">%1$s. Ralentissez !</string>
     <string name="alert_section_entered">Zone à vitesse moyenne, limite %1$d</string>
     <string name="alert_section_over">Moyenne trop élevée, ralentissez !</string>
@@ -78,7 +81,7 @@
     <string name="about_title">À propos</string>
     <string name="about_version">Version de l’application %1$s</string>
     <string name="about_attribution_title">Attribution des données</string>
-    <string name="about_attribution_body">Les positions des radars proviennent des données ouvertes du gouvernement taïwanais (data.gov.tw), jeux de données 7320 測速執法設置點 et 13940 國道公路固定式測速照相地點, publiés sous la licence Open Government Data License v1.0 (政府資料開放授權條款—第1版).</string>
+    <string name="about_attribution_body">Les positions des radars proviennent des données ouvertes du gouvernement taïwanais (data.gov.tw), publiées sous la licence Open Government Data License v1.0 (政府資料開放授權條款—第1版) : jeux de données 7320 測速執法設置點, 13940 國道公路固定式測速照相地點, 130111 臺北市固定測速照相地點表, 135957 臺北市智慧管理科技執法設備資料表, 25935 桃園市測速照相設備地點, 170673 臺中市科技執法取締地點 et 160171 高雄市111年交通局建置科技執法設備設置地點.</string>
     <string name="about_data_license">Voir la licence des données</string>
     <string name="about_code_title">Code et carte</string>
     <string name="about_license">Le code de l’application est open source sous licence MIT.</string>

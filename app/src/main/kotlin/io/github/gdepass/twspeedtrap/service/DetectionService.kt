@@ -18,6 +18,7 @@ import io.github.gdepass.twspeedtrap.data.CameraRepository
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.detection.AlertEngine
 import io.github.gdepass.twspeedtrap.detection.AlertEvent
+import io.github.gdepass.twspeedtrap.detection.CameraType
 import io.github.gdepass.twspeedtrap.util.LocaleOverride
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -105,10 +106,16 @@ class DetectionService : LifecycleService() {
                 val distance = roundForSpeech(event.distanceM)
                 val limit = event.camera.speedLimitKmh
                 var text =
-                    if (limit != null) {
-                        localized.getString(R.string.alert_fixed_camera_limit, distance, limit)
-                    } else {
-                        localized.getString(R.string.alert_fixed_camera, distance)
+                    when (event.camera.type) {
+                        CameraType.RED_LIGHT -> localized.getString(R.string.alert_red_light_camera, distance)
+                        CameraType.TECH -> localized.getString(R.string.alert_tech_enforcement, distance)
+                        CameraType.MOBILE -> localized.getString(R.string.alert_mobile_camera, distance)
+                        else ->
+                            if (limit != null) {
+                                localized.getString(R.string.alert_fixed_camera_limit, distance, limit)
+                            } else {
+                                localized.getString(R.string.alert_fixed_camera, distance)
+                            }
                     }
                 if (event.overLimit) {
                     text = localized.getString(R.string.alert_with_warning, text)

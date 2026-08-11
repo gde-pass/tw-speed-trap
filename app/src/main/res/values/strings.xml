@@ -38,6 +38,9 @@
     <!-- Spoken alerts: short and unambiguous at speed -->
     <string name="alert_fixed_camera">Fixed camera, %1$d metres</string>
     <string name="alert_fixed_camera_limit">Fixed camera, %1$d metres, limit %2$d</string>
+    <string name="alert_red_light_camera">Red-light camera, %1$d metres</string>
+    <string name="alert_tech_enforcement">Tech enforcement, %1$d metres</string>
+    <string name="alert_mobile_camera">Mobile camera, %1$d metres</string>
     <string name="alert_with_warning">%1$s. Slow down!</string>
     <string name="alert_section_entered">Average speed zone, limit %1$d</string>
     <string name="alert_section_over">Average too high, slow down!</string>
@@ -80,7 +83,7 @@
     <string name="about_title">About</string>
     <string name="about_version">App version %1$s</string>
     <string name="about_attribution_title">Data attribution</string>
-    <string name="about_attribution_body">Camera locations come from Taiwanese government open data (data.gov.tw), datasets 7320 測速執法設置點 and 13940 國道公路固定式測速照相地點, released under the Open Government Data License v1.0 (政府資料開放授權條款—第1版).</string>
+    <string name="about_attribution_body">Camera locations come from Taiwanese government open data (data.gov.tw), released under the Open Government Data License v1.0 (政府資料開放授權條款—第1版): datasets 7320 測速執法設置點, 13940 國道公路固定式測速照相地點, 130111 臺北市固定測速照相地點表, 135957 臺北市智慧管理科技執法設備資料表, 25935 桃園市測速照相設備地點, 170673 臺中市科技執法取締地點, and 160171 高雄市111年交通局建置科技執法設備設置地點.</string>
     <string name="about_data_license">View the data license</string>
     <string name="about_code_title">Code and map</string>
     <string name="about_license">The app code is open source under the MIT license.</string>
