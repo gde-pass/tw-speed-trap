@@ -1,0 +1,87 @@
+package io.github.gdepass.twspeedtrap.detection
+
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+
+data class EngineConfig(
+    /** Alert distance = max(minAlertDistanceM, speed_m/s × distanceMultiplier). */
+    val distanceMultiplier: Double = 12.0,
+    val minAlertDistanceM: Double = 200.0,
+    val bearingToleranceDeg: Double = 45.0,
+    /** Below this speed GPS bearing is noise; skip the bearing filter. */
+    val minSpeedForBearingMps: Double = 15.0 / 3.6,
+    val speedToleranceKmh: Double = 10.0,
+    val enabledTypes: Set<CameraType> = CameraType.entries.toSet(),
+    /** A fired camera re-arms only once you are this factor beyond its alert distance. */
+    val rearmFactor: Double = 1.5,
+)
+
+/**
+ * Turns a stream of GPS fixes into alert events. Each camera fires at most
+ * once per approach: after firing it stays disarmed until the rider has moved
+ * away beyond rearmFactor × alert distance (hysteresis).
+ */
+class AlertEngine(
+    cameras: List<Camera>,
+    private val config: EngineConfig = EngineConfig(),
+) {
+    private val index = GridIndex(cameras)
+    private val disarmed = HashSet<String>()
+
+    /** Distance to the nearest relevant camera, for the UI. */
+    var nearestCamera: Pair<Camera, Double>? = null
+        private set
+
+    fun onFix(fix: Fix): List<AlertEvent> {
+        val events = ArrayList<AlertEvent>(1)
+        val alertDistance = max(config.minAlertDistanceM, fix.speedMps * config.distanceMultiplier)
+        var nearest: Pair<Camera, Double>? = null
+
+        for (camera in index.near(fix.lat, fix.lon)) {
+            val distance = evaluate(camera, fix, alertDistance, events) ?: continue
+            if (nearest == null || distance < nearest.second) nearest = camera to distance
+        }
+        nearestCamera = nearest
+        return events
+    }
+
+    /** Returns the distance when the camera is relevant to this fix, else null. */
+    private fun evaluate(
+        camera: Camera,
+        fix: Fix,
+        alertDistance: Double,
+        events: MutableList<AlertEvent>,
+    ): Double? {
+        if (camera.type !in config.enabledTypes) return null
+        if (!bearingMatches(fix, camera)) return null
+        val distance = GeoMath.distanceMeters(fix.lat, fix.lon, camera.lat, camera.lon)
+        if (camera.id in disarmed) {
+            if (distance > alertDistance * config.rearmFactor) disarmed.remove(camera.id)
+        } else if (distance <= alertDistance) {
+            disarmed.add(camera.id)
+            events.add(AlertEvent.CameraAhead(camera, distance))
+        }
+        return distance
+    }
+
+    private fun bearingMatches(
+        fix: Fix,
+        camera: Camera,
+    ): Boolean {
+        val enforced = camera.bearingDeg ?: return true
+        if (fix.speedMps < config.minSpeedForBearingMps) return true
+        val travel = fix.bearingDeg ?: return true
+        return angularDifference(travel, enforced) <= config.bearingToleranceDeg
+    }
+
+    companion object {
+        fun angularDifference(
+            a: Double,
+            b: Double,
+        ): Double {
+            val diff = abs(a - b) % 360.0
+            return min(diff, 360.0 - diff)
+        }
+    }
+}
