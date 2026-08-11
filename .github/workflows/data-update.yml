@@ -45,8 +45,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/cameras.geojson app/src/main/assets/cameras.db
-          git commit -m "data: update camera database ($(jq -r .data_version pipeline/out/manifest.json), $(jq -r .count pipeline/out/manifest.json) cameras)"
-          git push
+          if git diff --cached --quiet; then
+            echo "snapshot unchanged, nothing to commit"
+          else
+            git commit -m "data: update camera database ($(jq -r .data_version pipeline/out/manifest.json), $(jq -r .count pipeline/out/manifest.json) cameras)"
+            git push
+          fi
 
       - name: Publish release assets
         if: steps.diff.outputs.changed == 'true'

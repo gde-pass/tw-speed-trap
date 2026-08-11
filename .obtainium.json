@@ -1,0 +1,7 @@
+{
+  "id": "io.github.gdepass.twspeedtrap",
+  "url": "https://github.com/gde-pass/tw-speed-trap",
+  "author": "gde-pass",
+  "name": "TW SpeedTrap",
+  "additionalSettings": "{\"includePrereleases\":false,\"fallbackToOlderReleases\":true,\"apkFilterRegEx\":\"tw-speed-trap.*\\\\.apk\"}"
+}

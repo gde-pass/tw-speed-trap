@@ -15,6 +15,7 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+secrets/
 
 # IDEA / Android Studio
 .idea/
