@@ -18,8 +18,15 @@ they change over time):
   Taoyuan speed and red-light cameras
 - [170673](https://data.gov.tw/dataset/170673) 臺中市科技執法取締地點 —
   Taichung tech enforcement
-- [160171](https://data.gov.tw/dataset/160171)
-  高雄市111年交通局建置科技執法設備設置地點 — Kaohsiung tech enforcement
+- Kaohsiung 115年 series (files on data.kcg.gov.tw, unreachable from GitHub
+  CI — the weekly build keeps the last local snapshot for these):
+  [176549](https://data.gov.tw/dataset/176549) 固定式違規照相科技執法設備
+  (speed + red-light),
+  [176555](https://data.gov.tw/dataset/176555) 不停讓行人,
+  [176558](https://data.gov.tw/dataset/176558) 交通局建置科技執法設備,
+  [176560](https://data.gov.tw/dataset/176560) 捷運局輕軌沿線,
+  [176561](https://data.gov.tw/dataset/176561) 路口科技執法監測系統,
+  [177827](https://data.gov.tw/dataset/177827) 租賃式車不停讓行人
 
 Average-speed (區間測速) rows in any source are excluded from point import —
 sections are hand-curated in `data/sections.yaml` with entry/exit pairs.

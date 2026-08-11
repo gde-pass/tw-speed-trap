@@ -18,7 +18,12 @@ SOURCE_130111 = "gov.tw:130111"
 SOURCE_135957 = "gov.tw:135957"
 SOURCE_170673 = "gov.tw:170673"
 SOURCE_25935 = "gov.tw:25935"
-SOURCE_160171 = "gov.tw:160171"
+SOURCE_176549 = "gov.tw:176549"
+SOURCE_176555 = "gov.tw:176555"
+SOURCE_176558 = "gov.tw:176558"
+SOURCE_176560 = "gov.tw:176560"
+SOURCE_176561 = "gov.tw:176561"
+SOURCE_177827 = "gov.tw:177827"
 
 
 class SchemaError(RuntimeError):
@@ -300,44 +305,124 @@ def parse_25935(text: str, today: str) -> tuple[list[Camera], list[Unresolved], 
     return cameras, unresolved, stats
 
 
-def parse_160171(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
-    """Kaohsiung tech enforcement (高雄市111年交通局建置科技執法設備設置地點).
-    A single 座標 column holds latitude and longitude separated by runs of
-    spaces; 編號 is blank on the extra rows of multi-camera intersections."""
+def parse_176549(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Kaohsiung fixed enforcement cameras (高雄市115年固定式違規照相科技執法
+    設備設置地點一覽表). 測照型式 mixes 闖紅燈/超速 combinations: anything
+    measuring speed stays `fixed` (dedupes against national twins, keeps the
+    speed limit); red-light-only devices become `red_light`."""
     reader = csv.DictReader(io.StringIO(_strip_bom(text)))
-    _require_columns(reader.fieldnames, {"編號", "地點", "測照行向", "取締項目", "座標"}, SOURCE_160171)
+    _require_columns(
+        reader.fieldnames, {"編號", "測照地點", "測照方向", "速限", "測照型式", "座標緯度", "座標經度"}, SOURCE_176549
+    )
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        kind = (row.get("測照型式") or "").strip()
+        if _is_section(kind):
+            stats["176549_sections_excluded"] += 1
+            continue
+        if "超速" in kind:
+            cam_type = "fixed"
+        elif "闖紅燈" in kind:
+            cam_type = "red_light"
+        else:
+            cam_type = "tech"
+        try:
+            lat, lon = normalize_coords(row.get("座標緯度"), row.get("座標經度"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(SOURCE_176549, str(e), dict(row)))
+            continue
+        description = (row.get("測照地點") or "").strip()
+        area = (row.get("行政區") or "").strip()
+        if area and area not in description:
+            description = f"{area} {description}".strip()
+        bearing = parse_bearing(row.get("測照方向"))
+        # 速限 like 50/40 lists car/truck limits — keep the general (first) one.
+        limit = parse_limit((row.get("速限") or "").split("/")[0])
+        stats[f"176549_type:{cam_type}"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(SOURCE_176549, lat, lon, bearing),
+                lat=lat,
+                lon=lon,
+                type=cam_type,
+                speed_limit=limit,
+                bearing=bearing,
+                city="高雄市",
+                description=description,
+                source=SOURCE_176549,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats
+
+
+def _parse_kaohsiung_tech(
+    text: str, today: str, source: str, place_col: str
+) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Shared shape of Kaohsiung's 科技執法 datasets: 編號/測照行向/取締項目 +
+    座標緯度/座標經度, with the location under 地點 or 設置位置."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    _require_columns(reader.fieldnames, {"編號", place_col, "測照行向", "取締項目", "座標緯度", "座標經度"}, source)
+    dataset_id = source.rsplit(":", 1)[-1]
     cameras: list[Camera] = []
     unresolved: list[Unresolved] = []
     stats: Counter = Counter()
     for row in reader:
         items = (row.get("取締項目") or "").strip()
         if _is_section(items):
-            stats["160171_sections_excluded"] += 1
+            stats[f"{dataset_id}_sections_excluded"] += 1
             continue
         cam_type = "red_light" if "闖紅燈" in items else "tech"
-        parts = (row.get("座標") or "").split()
-        if len(parts) != 2:
-            unresolved.append(Unresolved(SOURCE_160171, f"unsplittable 座標: {row.get('座標')!r}", dict(row)))
-            continue
         try:
-            lat, lon = normalize_coords(parts[0], parts[1])
+            lat, lon = normalize_coords(row.get("座標緯度"), row.get("座標經度"))
         except CoordinateError as e:
-            unresolved.append(Unresolved(SOURCE_160171, str(e), dict(row)))
+            unresolved.append(Unresolved(source, str(e), dict(row)))
             continue
         bearing = parse_bearing(row.get("測照行向"))
-        stats[f"160171_type:{cam_type}"] += 1
+        stats[f"{dataset_id}_type:{cam_type}"] += 1
         cameras.append(
             Camera(
-                id=make_id(SOURCE_160171, lat, lon, bearing),
+                id=make_id(source, lat, lon, bearing),
                 lat=lat,
                 lon=lon,
                 type=cam_type,
                 speed_limit=None,
                 bearing=bearing,
                 city="高雄市",
-                description=(row.get("地點") or "").strip(),
-                source=SOURCE_160171,
+                description=(row.get(place_col) or "").strip(),
+                source=source,
                 last_seen=today,
             )
         )
     return cameras, unresolved, stats
+
+
+def parse_176555(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Kaohsiung 不停讓行人 enforcement (高雄市115年不停讓行人科技執法監測系統)."""
+    return _parse_kaohsiung_tech(text, today, SOURCE_176555, "設置位置")
+
+
+def parse_176558(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Kaohsiung traffic-bureau tech enforcement (高雄市115年交通局建置科技執法
+    設備設置地點) — current successor of the retired 111年 dataset 160171."""
+    return _parse_kaohsiung_tech(text, today, SOURCE_176558, "地點")
+
+
+def parse_176560(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Kaohsiung light-rail corridor enforcement (高雄市115年捷運局輕軌沿線建置
+    科技執法設備設置地點)."""
+    return _parse_kaohsiung_tech(text, today, SOURCE_176560, "地點")
+
+
+def parse_176561(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Kaohsiung intersection enforcement (高雄市115年路口科技執法監測系統設置
+    地點); carries a stray remarks column (Column1) we ignore."""
+    return _parse_kaohsiung_tech(text, today, SOURCE_176561, "設置位置")
+
+
+def parse_177827(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Kaohsiung rental-vehicle pedestrian-yield enforcement (高雄市115年租賃式
+    車不停讓行人科技執法地點)."""
+    return _parse_kaohsiung_tech(text, today, SOURCE_177827, "設置位置")

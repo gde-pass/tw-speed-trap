@@ -8,8 +8,13 @@ from twsp_pipeline.parse import (
     SchemaError,
     parse_130111,
     parse_135957,
-    parse_160171,
     parse_170673,
+    parse_176549,
+    parse_176555,
+    parse_176558,
+    parse_176560,
+    parse_176561,
+    parse_177827,
     parse_25935,
 )
 
@@ -47,13 +52,25 @@ CSV_25935 = """設備編號,型式,縣市,行政區,設置區域描述,設置地
 15,測速暨闖紅燈照相執法,桃園市,中壢區,,中華路普忠路口,闖紅燈,24.965984,121.24136,往中壢方向,x,中壢分局,
 """
 
-# Latitude and longitude share one 座標 column, separated by runs of spaces;
-# 編號 is blank on the extra rows of multi-camera intersections.
-CSV_160171 = """Seq,編號,地點,測照行向,取締項目,座標
-1,1,前鎮區中華五路與時代大道路口東側,北向南,路口各項違規(機車行駛人行穿越道線、逆向、未依二段式左轉等),22.596786         120.308637
-7,5,新興區中山一路與五福二路東側,東西向,不禮讓行人,22.623284  120.301296
-8,,新興區中山一路與五福二路北側,南北向,不禮讓行人,22.623324  120.301022
-9,6,左營區博愛二路與裕誠路北側,南北向,不禮讓行人,bogus
+CSV_176549 = """Seq,編號,型式,測照地點,測照方向,速限,行政區,測照型式,座標緯度,座標經度
+1,1,非線圈數位-雷射,民族一路與十全一路口,北向南,60,三民,闖紅燈,22.644858,120.314341
+16,16,非線圈數位-雷射(雷達),大中一路與鼎中路口東向西右側,東向西,50,三民,闖紅燈兼超速,22.676705,120.323591
+7,7,線圈數位,中山高西側便道與九如一路口,北向南,違左,三民,違左,22.63776,120.336788
+76,76,非線圈數位-雷射,小港區沿海一路與康莊路口,北向南,60/40,小港,闖紅燈,22.568001,120.350672
+"""
+
+# The five same-shape Kaohsiung 科技執法 datasets differ only in whether the
+# location column is 地點 or 設置位置 (176561 adds a stray remarks Column1).
+CSV_176558 = """Seq,編號,地點,測照行向,取締項目,座標緯度,座標經度
+5,5,大寮區市道188號/鳳林二路口(西向),東向西,路口各項違規(闖紅燈、不依標誌標線號誌行駛等),22.586728,120.40514
+"""
+
+CSV_176561 = """Seq,編號,設置位置,取締項目,測照行向,座標緯度,座標經度,Column1
+18,18,小港區中山四路/平和東路,路口各項違規(闖紅燈、超速、不依標誌標線號誌行駛等),北向南,22.570253,120.33743,有取締超速功能
+"""
+
+CSV_176555 = """Seq,編號,設置位置,取締項目,測照行向,座標緯度,座標經度
+1,1,三民區大昌二路/義華路,車不停讓行人,北側,22.643492,120.332100
 """
 
 
@@ -107,17 +124,55 @@ def test_25935_types_and_stable_equipment_ids():
     assert red.speed_limit is None  # 速限 is the literal "x"
 
 
-def test_160171_packed_coordinate_column():
-    cameras, unresolved, _ = parse_160171(CSV_160171, "2026-08-11")
-    assert len(cameras) == 3
-    assert len(unresolved) == 1  # the "bogus" 座標
-    assert all(cam.type == "tech" for cam in cameras)
-    assert cameras[0].bearing == 180.0  # 北向南
-    assert cameras[1].bearing is None  # 東西向 = both directions
-    assert {round(cameras[0].lat, 3), round(cameras[0].lon, 3)} == {22.597, 120.309}
+def test_176549_type_split_and_slashed_limits():
+    cameras, unresolved, _ = parse_176549(CSV_176549, "2026-08-11")
+    assert not unresolved
+    types = {cam.id: cam for cam in cameras}
+    red = next(cam for cam in cameras if "民族一路" in cam.description)
+    assert red.type == "red_light"
+    assert red.speed_limit == 60
+    assert red.bearing == 180.0  # 北向南
+    assert red.description == "三民 民族一路與十全一路口"  # 行政區 prepended
+    dual = next(cam for cam in cameras if "大中一路" in cam.description)
+    assert dual.type == "fixed"  # 闖紅燈兼超速 measures speed
+    left_turn = next(cam for cam in cameras if "九如一路口" in cam.description)
+    assert left_turn.type == "tech"  # 違左
+    assert left_turn.speed_limit is None  # 速限 holds the literal 違左
+    slashed = next(cam for cam in cameras if "沿海一路" in cam.description)
+    assert slashed.speed_limit == 60  # 60/40 keeps the general limit
+    assert len(types) == 4
+
+
+def test_kaohsiung_tech_family_location_columns_and_types():
+    cameras, unresolved, stats = parse_176558(CSV_176558, "2026-08-11")
+    assert not unresolved
+    assert cameras[0].type == "red_light"  # 闖紅燈 in 取締項目
+    assert cameras[0].bearing == 270.0  # 東向西
+    assert cameras[0].description == "大寮區市道188號/鳳林二路口(西向)"
+    assert stats["176558_type:red_light"] == 1
+
+    cameras, _, _ = parse_176561(CSV_176561, "2026-08-11")  # 設置位置 + stray Column1
+    assert cameras[0].type == "red_light"
+    assert cameras[0].description == "小港區中山四路/平和東路"
+
+    cameras, _, _ = parse_176555(CSV_176555, "2026-08-11")
+    assert cameras[0].type == "tech"  # 車不停讓行人, no 闖紅燈
+    assert cameras[0].bearing is None  # 北側 is a device side, not a direction
 
 
 def test_municipal_missing_columns_fail_loudly():
-    for parse in (parse_130111, parse_135957, parse_170673, parse_25935, parse_160171):
+    parsers = (
+        parse_130111,
+        parse_135957,
+        parse_170673,
+        parse_25935,
+        parse_176549,
+        parse_176555,
+        parse_176558,
+        parse_176560,
+        parse_176561,
+        parse_177827,
+    )
+    for parse in parsers:
         with pytest.raises(SchemaError):
             parse("foo,bar\n1,2\n", "2026-08-11")

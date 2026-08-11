@@ -17,15 +17,25 @@ from .parse import (
     SOURCE_130111,
     SOURCE_13940,
     SOURCE_135957,
-    SOURCE_160171,
     SOURCE_170673,
+    SOURCE_176549,
+    SOURCE_176555,
+    SOURCE_176558,
+    SOURCE_176560,
+    SOURCE_176561,
+    SOURCE_177827,
     SOURCE_25935,
     SOURCE_7320,
     parse_130111,
     parse_13940,
     parse_135957,
-    parse_160171,
     parse_170673,
+    parse_176549,
+    parse_176555,
+    parse_176558,
+    parse_176560,
+    parse_176561,
+    parse_177827,
     parse_25935,
     parse_7320,
 )
@@ -33,7 +43,8 @@ from .sections import load_sections
 
 # Order = dedupe priority: national sets first (13940's stable equipment ids
 # and 7320's coverage win ties), then municipal sets richest-metadata first —
-# 130111 before 135957 so Taipei red-light twins keep bearing and speed limit.
+# 130111 before 135957 so Taipei red-light twins keep bearing and speed limit,
+# 176549 before the other Kaohsiung sets for the same reason.
 DATASETS = (
     (13940, parse_13940, SOURCE_13940),
     (7320, parse_7320, SOURCE_7320),
@@ -41,7 +52,12 @@ DATASETS = (
     (25935, parse_25935, SOURCE_25935),
     (135957, parse_135957, SOURCE_135957),
     (170673, parse_170673, SOURCE_170673),
-    (160171, parse_160171, SOURCE_160171),
+    (176549, parse_176549, SOURCE_176549),
+    (176558, parse_176558, SOURCE_176558),
+    (176560, parse_176560, SOURCE_176560),
+    (176561, parse_176561, SOURCE_176561),
+    (176555, parse_176555, SOURCE_176555),
+    (177827, parse_177827, SOURCE_177827),
 )
 
 
