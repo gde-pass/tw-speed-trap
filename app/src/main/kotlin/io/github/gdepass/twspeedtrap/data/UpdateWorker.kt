@@ -17,9 +17,12 @@ class UpdateWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result =
-        when (DbUpdater(applicationContext).checkAndUpdate()) {
+        when (val result = DbUpdater(applicationContext).checkAndUpdate()) {
             is UpdateResult.Updated, UpdateResult.UpToDate -> Result.success()
-            is UpdateResult.Failed -> Result.retry()
+            is UpdateResult.Failed ->
+                // Permanent failures (schema needs a newer app) must not burn
+                // battery retrying on the backoff curve until the next period.
+                if (result.permanent) Result.failure() else Result.retry()
         }
 
     companion object {

@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.Buffer
 import java.io.File
 
 sealed interface UpdateResult {
@@ -19,14 +20,17 @@ sealed interface UpdateResult {
 
     data class Failed(
         val reason: String,
+        /** True when retrying cannot help (e.g. the data schema needs a newer app). */
+        val permanent: Boolean = false,
     ) : UpdateResult
 }
 
 /**
  * Fetches manifest.json from the rolling `data` release, and if it announces
- * a newer database: downloads it, verifies the SHA-256 and that SQLite can
- * actually read it, then swaps it in atomically (same-directory rename).
- * Any failure leaves the current database untouched.
+ * a newer database: downloads it (from this repo's release URLs only, with
+ * size caps), verifies the SHA-256, that SQLite can read it, and that its
+ * own metadata matches the manifest, then swaps it in atomically
+ * (same-directory rename). Any failure leaves the current database untouched.
  */
 class DbUpdater(
     context: Context,
@@ -48,25 +52,32 @@ class DbUpdater(
     @Suppress("ReturnCount") // guard-clause validation chain reads best with early returns
     private fun update(): UpdateResult {
         val manifestText =
-            fetch(MANIFEST_URL) ?: return UpdateResult.Failed("manifest download failed")
+            fetch(MANIFEST_URL, MAX_MANIFEST_BYTES) ?: return UpdateResult.Failed("manifest download failed")
         val manifest = UpdateVerifier.parseManifest(manifestText.decodeToString())
         if (manifest.schemaVersion > UpdateVerifier.SUPPORTED_SCHEMA_VERSION) {
-            return UpdateResult.Failed("data schema ${manifest.schemaVersion} needs a newer app")
+            return UpdateResult.Failed("data schema ${manifest.schemaVersion} needs a newer app", permanent = true)
+        }
+        if (!UpdateVerifier.isValidVersion(manifest.dataVersion)) {
+            return UpdateResult.Failed("unrecognized data_version format")
+        }
+        if (!UpdateVerifier.isTrustedUrl(manifest.url)) {
+            return UpdateResult.Failed("untrusted database URL")
         }
         val localVersion = repository.metadata()["data_version"]
         if (!UpdateVerifier.isNewer(manifest.dataVersion, localVersion)) return UpdateResult.UpToDate
 
-        val dbBytes = fetch(manifest.url) ?: return UpdateResult.Failed("database download failed")
+        val dbBytes = fetch(manifest.url, MAX_DB_BYTES) ?: return UpdateResult.Failed("database download failed")
         if (!UpdateVerifier.sha256Hex(dbBytes).equals(manifest.sha256, ignoreCase = true)) {
             return UpdateResult.Failed("checksum mismatch")
         }
 
         val target = repository.databaseFile()
         val tmp = File(target.parentFile, "${target.name}.tmp")
+        tmp.delete() // orphan from an earlier crashed attempt
         tmp.writeBytes(dbBytes)
-        if (!sqliteReadable(tmp)) {
+        if (!sqliteValid(tmp, manifest)) {
             tmp.delete()
-            return UpdateResult.Failed("downloaded database is not readable")
+            return UpdateResult.Failed("downloaded database failed validation")
         }
         if (!tmp.renameTo(target)) {
             tmp.delete()
@@ -76,7 +87,11 @@ class DbUpdater(
         return UpdateResult.Updated(manifest.dataVersion, manifest.count)
     }
 
-    private fun fetch(url: String): ByteArray? =
+    /** Reads at most [maxBytes]; anything larger is treated as a failed download. */
+    private fun fetch(
+        url: String,
+        maxBytes: Long,
+    ): ByteArray? =
         client
             .newCall(
                 Request
@@ -87,15 +102,37 @@ class DbUpdater(
             ).execute()
             .use { response ->
                 if (!response.isSuccessful) return null
-                response.body.bytes()
+                val body = response.body
+                if (body.contentLength() > maxBytes) return null
+                val buffer = Buffer()
+                val source = body.source()
+                while (source.read(buffer, SEGMENT_BYTES) != -1L) {
+                    if (buffer.size > maxBytes) return null
+                }
+                buffer.readByteArray()
             }
 
-    private fun sqliteReadable(file: File): Boolean =
+    /** The database must be readable AND describe itself exactly as the manifest does. */
+    private fun sqliteValid(
+        file: File,
+        manifest: UpdateVerifier.DataManifest,
+    ): Boolean =
         runCatching {
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-                db.rawQuery("SELECT COUNT(*) FROM cameras", null).use { cursor ->
-                    cursor.moveToFirst() && cursor.getInt(0) > 0
-                }
+                val cameraCount =
+                    db.rawQuery("SELECT COUNT(*) FROM cameras", null).use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getInt(0) else 0
+                    }
+                // The sections table must exist too: a db missing it would only
+                // crash later, at the next detection start.
+                db.rawQuery("SELECT COUNT(*) FROM sections", null).use { it.moveToFirst() }
+                val dataVersion =
+                    db.rawQuery("SELECT value FROM meta WHERE key = 'data_version'", null).use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                cameraCount >= MIN_CAMERA_COUNT &&
+                    cameraCount == manifest.count &&
+                    dataVersion == manifest.dataVersion
             }
         }.getOrDefault(false)
 
@@ -104,5 +141,11 @@ class DbUpdater(
         private const val USER_AGENT = "tw-speed-trap-app"
         const val MANIFEST_URL =
             "https://github.com/gde-pass/tw-speed-trap/releases/download/data/manifest.json"
+        private const val MAX_MANIFEST_BYTES = 64L * 1024
+        private const val MAX_DB_BYTES = 32L * 1024 * 1024
+        private const val SEGMENT_BYTES = 8_192L
+
+        /** A plausible national database is thousands of rows; a tiny one means a broken build upstream. */
+        private const val MIN_CAMERA_COUNT = 500
     }
 }

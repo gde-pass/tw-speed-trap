@@ -44,4 +44,35 @@ class UpdateVerifierTest {
         assertTrue(UpdateVerifier.isNewer("2026-08-11", null))
         assertTrue(UpdateVerifier.isNewer("2026-08-11", ""))
     }
+
+    @Test
+    fun `version format guard accepts the pipeline format only`() {
+        assertTrue(UpdateVerifier.isValidVersion("2026-08-11T12:39"))
+        assertFalse(UpdateVerifier.isValidVersion("2026-08-11"))
+        assertFalse(UpdateVerifier.isValidVersion("2026-8-1T9:5"))
+        assertFalse(UpdateVerifier.isValidVersion("v2"))
+        assertFalse(UpdateVerifier.isValidVersion(""))
+    }
+
+    @Test
+    fun `only this repo's release downloads are trusted urls`() {
+        assertTrue(
+            UpdateVerifier.isTrustedUrl(
+                "https://github.com/gde-pass/tw-speed-trap/releases/download/data/cameras.db",
+            ),
+        )
+        assertFalse(
+            UpdateVerifier.isTrustedUrl(
+                "http://github.com/gde-pass/tw-speed-trap/releases/download/data/cameras.db",
+            ),
+        )
+        assertFalse(UpdateVerifier.isTrustedUrl("https://evil.example.com/cameras.db"))
+        assertFalse(UpdateVerifier.isTrustedUrl("https://github.com/someone-else/repo/releases/download/x.db"))
+        assertFalse(
+            UpdateVerifier.isTrustedUrl(
+                "https://github.com@evil.example.com/gde-pass/tw-speed-trap/releases/download/x",
+            ),
+        )
+        assertFalse(UpdateVerifier.isTrustedUrl("not a url"))
+    }
 }
