@@ -2,6 +2,7 @@
 
 import argparse
 import shutil
+import sqlite3
 import sys
 from collections import Counter
 from datetime import date
@@ -10,16 +11,38 @@ from pathlib import Path
 from .decode import decode_bytes
 from .dedupe import dedupe
 from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
-from .fetch import download, extract_csv_payloads, resolve_csv_url
+from .fetch import FetchError, download, extract_csv_payloads, resolve_csv_url
 from .model import Camera, Unresolved
-from .parse import parse_13940, parse_7320
+from .parse import SOURCE_13940, SOURCE_7320, parse_13940, parse_7320
 from .sections import load_sections
 
 # 13940 first: richer freeway metadata (stable equipment ids) wins dedupe ties.
 DATASETS = (
-    (13940, parse_13940),
-    (7320, parse_7320),
+    (13940, parse_13940, SOURCE_13940),
+    (7320, parse_7320, SOURCE_7320),
 )
+
+
+def load_previous_snapshot(db_path: Path, source: str) -> list[Camera] | None:
+    """Rows for one source from the last committed database. Used when a
+    dataset's host rejects the CI runner (tgos.tw 403s GitHub IPs): better to
+    keep yesterday's freeway cameras than to drop them or fail the week's
+    update. last_seen is preserved so staleness stays visible."""
+    if not db_path.exists():
+        return None
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, lat, lon, type, speed_limit, bearing, city, description,
+                   source, last_seen, section_id, section_role
+            FROM cameras WHERE source = ?
+            """,
+            (source,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [Camera(*row) for row in rows] or None
 
 
 def _fetch_texts(dataset_id: int, cache_dir: Path | None) -> list[str]:
@@ -49,6 +72,12 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("pipeline/data/sections.yaml"),
         help="curated average-speed sections YAML",
     )
+    parser.add_argument(
+        "--fallback-db",
+        type=Path,
+        default=Path("app/src/main/assets/cameras.db"),
+        help="previous database used to keep a source's rows when its host is unreachable",
+    )
     args = parser.parse_args(argv)
 
     today = date.today().isoformat()
@@ -56,9 +85,21 @@ def main(argv: list[str] | None = None) -> int:
     all_unresolved: list[Unresolved] = []
     stats: Counter = Counter()
 
-    for dataset_id, parse_fn in DATASETS:
+    stale_sources: list[str] = []
+    for dataset_id, parse_fn, source in DATASETS:
         print(f"dataset {dataset_id}:")
-        for text in _fetch_texts(dataset_id, args.cache):
+        try:
+            texts = _fetch_texts(dataset_id, args.cache)
+        except FetchError as e:
+            print(f"  FETCH FAILED: {e}")
+            previous = load_previous_snapshot(args.fallback_db, source)
+            if previous is None:
+                raise
+            print(f"  KEEPING PREVIOUS SNAPSHOT: {len(previous)} cameras (last seen {previous[0].last_seen})")
+            all_cameras.extend(previous)
+            stale_sources.append(source)
+            continue
+        for text in texts:
             cameras, unresolved, source_stats = parse_fn(text, today)
             print(f"  parsed {len(cameras)} cameras, {len(unresolved)} unresolved")
             all_cameras.extend(cameras)
@@ -93,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"with bearing: {with_bearing}, with speed limit: {with_limit}")
     print(f"top cities: {by_city.most_common(10)}")
     print(f"unresolved rows: {len(all_unresolved)} (see {args.out / 'unresolved.csv'})")
+    if stale_sources:
+        print(f"STALE SOURCES (host unreachable, previous snapshot kept): {stale_sources}")
     notable = {k: v for k, v in stats.items() if not k.startswith("bearing_both")}
     print(f"source stats: {notable}")
     print(f"data_version: {manifest['data_version']}, content_hash: {manifest['content_hash'][:12]}…")
