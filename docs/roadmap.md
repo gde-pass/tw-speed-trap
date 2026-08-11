@@ -69,11 +69,13 @@ that used datasets still resolve, re-checks coordinate-less ones (Tainan
 
 ## Smaller items
 
-- Recognize 「A至B」-style rows in dataset 7320 as section hints instead of
-  point cameras (suppress the redundant point alert near a curated section
-  exit).
-- Auto-start detection on Bluetooth connect; auto-stop when stationary for
-  N minutes.
+- ~~Recognize 「A至B」-style rows in dataset 7320 as section hints~~ —
+  shipped in v1.2: rows along a curated section corridor are suppressed.
+- ~~Auto-start on Bluetooth connect; auto-stop when stationary~~ — shipped
+  in v1.2, both opt-in. Auto-start degrades to a tap-to-start notification
+  where Android 12+ blocks background service starts; if that fallback
+  fires too often in practice, the CompanionDeviceManager presence API is
+  the exemption-carrying upgrade path.
 - Verify the remaining `sections.yaml` candidates as second anchors turn up
   (each is a ~10-minute job with `scratchpad` tooling — see the comment
   block in that file for what each zone still needs).
