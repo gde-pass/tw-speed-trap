@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -23,9 +24,12 @@ import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.detection.AlertEngine
 import io.github.gdepass.twspeedtrap.detection.AlertEvent
 import io.github.gdepass.twspeedtrap.detection.CameraType
+import io.github.gdepass.twspeedtrap.detection.StationaryDetector
 import io.github.gdepass.twspeedtrap.util.LocaleOverride
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,8 +40,8 @@ class DetectionService : LifecycleService() {
     private var announcer: Announcer? = null
     private var chimeEnabled = true
     private lateinit var localized: Context
-    private var stationarySinceMs: Long? = null
     private var locationMonitor: BroadcastReceiver? = null
+    private var lastNotificationText: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -64,52 +68,98 @@ class DetectionService : LifecycleService() {
     }
 
     private fun startDetection() {
-        if (detectionJob != null) return
+        // Every start request must reach startForeground, including redundant
+        // ones while already running (Bluetooth auto-start, notification tap).
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
-            buildNotification(getString(R.string.notif_starting)),
+            buildNotification(lastNotificationText ?: getString(R.string.notif_starting)),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
+        if (detectionJob != null) return
 
         detectionJob =
             lifecycleScope.launch {
-                val settings = SettingsRepository(applicationContext).settings.first()
-                chimeEnabled = settings.chimeEnabled
-                // Spoken alerts and notification text follow the app language.
-                localized = LocaleOverride.wrap(this@DetectionService, settings.languageTag)
-                announcer =
-                    Announcer(
-                        this@DetectionService,
-                        LocaleOverride.resolve(this@DetectionService, settings.languageTag),
-                    ) { missing -> DetectionStatus.update { it.copy(voiceMissing = missing) } }
-                val repository = CameraRepository(this@DetectionService)
-                val (cameras, sections) =
-                    withContext(Dispatchers.IO) { repository.loadCameras() to repository.loadSections() }
-                val engine = AlertEngine(cameras, settings.toEngineConfig(), sections)
-                DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
-                watchLocationServices()
-
-                LocationSource(this@DetectionService).fixes().collect { fix ->
-                    if (settings.autoStopEnabled && stationaryTooLong(fix.speedMps, fix.timestampMs)) {
-                        Log.i(TAG, "stationary for ${AUTO_STOP_AFTER_MS / 60_000} min — stopping detection")
-                        stopDetection()
-                        return@collect
-                    }
-                    engine.onFix(fix).forEach(::announce)
-                    val nearest = engine.nearestCamera
-                    val speedKmh = (fix.speedMps * 3.6).roundToInt()
-                    DetectionStatus.update {
-                        it.copy(
-                            speedKmh = speedKmh,
-                            accuracyM = fix.accuracyM.roundToInt(),
-                            nextCameraDistanceM = nearest?.second?.roundToInt(),
-                            nextCameraLimitKmh = nearest?.first?.speedLimitKmh,
-                        )
-                    }
-                    updateNotification(speedKmh, nearest?.second?.roundToInt())
+                @Suppress("TooGenericExceptionCaught") // whatever breaks, the rider must hear about it
+                try {
+                    runDetection()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "detection failed", e)
+                    reportFailure(e)
                 }
             }
+    }
+
+    private suspend fun runDetection() {
+        val settings = SettingsRepository(applicationContext).settings.first()
+        chimeEnabled = settings.chimeEnabled
+        // Spoken alerts and notification text follow the app language.
+        localized = LocaleOverride.wrap(this@DetectionService, settings.languageTag)
+        announcer =
+            Announcer(
+                this@DetectionService,
+                LocaleOverride.resolve(this@DetectionService, settings.languageTag),
+            ) { missing -> DetectionStatus.update { it.copy(voiceMissing = missing) } }
+        // Watch the system location toggle from the start: a transition during
+        // the database load below must not go unnoticed.
+        watchLocationServices()
+        val repository = CameraRepository(this@DetectionService)
+        val (cameras, sections) =
+            withContext(Dispatchers.IO) { repository.loadCameras() to repository.loadSections() }
+        val engine = AlertEngine(cameras, settings.toEngineConfig(), sections)
+        DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
+        val stationary = StationaryDetector()
+        val throttle = NotificationThrottle()
+
+        LocationSource(this@DetectionService).fixes().collect { fix ->
+            if (settings.autoStopEnabled && stationary.onFix(fix)) {
+                Log.i(TAG, "stationary for ${StationaryDetector.HOLD_MS / 60_000} min — stopping detection")
+                announcer?.speak(localized.getString(R.string.alert_auto_stopped), chimeEnabled)
+                delay(AUTO_STOP_SPEECH_MS)
+                stopDetection()
+                return@collect
+            }
+            engine.onFix(fix).forEach(::announce)
+            val nearest = engine.nearestCamera
+            val speedKmh = (fix.speedMps * 3.6).roundToInt()
+            DetectionStatus.update {
+                it.copy(
+                    speedKmh = speedKmh,
+                    accuracyM = fix.accuracyM.roundToInt(),
+                    nextCameraDistanceM = nearest?.second?.roundToInt(),
+                    nextCameraLimitKmh = nearest?.first?.speedLimitKmh,
+                )
+            }
+            val rendered =
+                NotificationThrottle.Rendered(
+                    speedKmh,
+                    nearest?.second?.roundToInt()?.let(NotificationThrottle::bucket),
+                )
+            if (throttle.shouldNotify(rendered, SystemClock.elapsedRealtime())) {
+                updateNotification(rendered.speedKmh, rendered.distanceBucketM)
+            }
+        }
+    }
+
+    /** Detection died (revoked permission, corrupt database, …): the rider
+     * must not believe they are still protected. */
+    private suspend fun reportFailure(e: Exception) {
+        val text = localized.getString(R.string.notif_detection_failed, e.message ?: e.javaClass.simpleName)
+        getSystemService(NotificationManager::class.java).notify(
+            FAILURE_NOTIFICATION_ID,
+            NotificationCompat
+                .Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(getString(R.string.notif_title))
+                .setContentText(text)
+                .setAutoCancel(true)
+                .build(),
+        )
+        announcer?.speak(localized.getString(R.string.alert_detection_failed), chimeEnabled)
+        delay(AUTO_STOP_SPEECH_MS)
+        stopDetection()
     }
 
     private fun announce(event: AlertEvent) {
@@ -146,9 +196,11 @@ class DetectionService : LifecycleService() {
                 announcer?.speak(text, chime = false)
             }
             is AlertEvent.SectionExited -> {
-                var text = localized.getString(R.string.alert_section_exited, event.averageKmh)
+                val resource =
+                    if (event.estimated) R.string.alert_section_exited_estimated else R.string.alert_section_exited
+                var text = localized.getString(resource, event.averageKmh)
                 if (event.overLimit) text = localized.getString(R.string.alert_with_warning, text)
-                Log.i(TAG, "alert: $text (${event.section.id})")
+                Log.i(TAG, "alert: $text (${event.section.id}, estimated=${event.estimated})")
                 announcer?.speak(text, chime = false)
             }
         }
@@ -157,7 +209,7 @@ class DetectionService : LifecycleService() {
     private fun stopDetection() {
         detectionJob?.cancel()
         detectionJob = null
-        stationarySinceMs = null
+        lastNotificationText = null
         locationMonitor?.let(::unregisterReceiver)
         locationMonitor = null
         announcer?.release()
@@ -204,8 +256,7 @@ class DetectionService : LifecycleService() {
             Log.w(TAG, "location services turned off while detecting")
             DetectionStatus.update { it.copy(locationOff = true) }
             announcer?.speak(localized.getString(R.string.alert_location_off), chimeEnabled)
-            getSystemService(NotificationManager::class.java)
-                .notify(NOTIFICATION_ID, buildNotification(localized.getString(R.string.notif_location_off)))
+            postNotification(localized.getString(R.string.notif_location_off))
         } else if (enabled && wasOff) {
             DetectionStatus.update { it.copy(locationOff = false) }
             announcer?.speak(localized.getString(R.string.alert_location_on), chimeEnabled)
@@ -222,32 +273,36 @@ class DetectionService : LifecycleService() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private fun buildNotification(text: String): Notification {
-        val openApp =
-            PendingIntent.getActivity(
-                this,
-                0,
-                Intent(this, MainActivity::class.java),
-                PendingIntent.FLAG_IMMUTABLE,
-            )
-        val stop =
-            PendingIntent.getService(
-                this,
-                1,
-                Intent(this, DetectionService::class.java).setAction(ACTION_STOP),
-                PendingIntent.FLAG_IMMUTABLE,
-            )
-        return NotificationCompat
+    // The intents are constant, so the PendingIntents can be created once per
+    // service instance instead of twice per notification post.
+    private val openAppIntent: PendingIntent by lazy {
+        PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+    private val stopIntent: PendingIntent by lazy {
+        PendingIntent.getService(
+            this,
+            1,
+            Intent(this, DetectionService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun buildNotification(text: String): Notification =
+        NotificationCompat
             .Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.notif_title))
             .setContentText(text)
-            .setContentIntent(openApp)
+            .setContentIntent(openAppIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(0, getString(R.string.notif_stop), stop)
+            .addAction(0, getString(R.string.notif_stop), stopIntent)
             .build()
-    }
 
     private fun updateNotification(
         speedKmh: Int,
@@ -259,32 +314,22 @@ class DetectionService : LifecycleService() {
             } else {
                 localized.getString(R.string.notif_speed, speedKmh)
             }
+        postNotification(text)
+    }
+
+    private fun postNotification(text: String) {
+        lastNotificationText = text
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
     }
 
     private fun roundForSpeech(distanceM: Double): Int = ((distanceM / 50.0).roundToInt() * 50).coerceAtLeast(50)
 
-    /** True once every fix for AUTO_STOP_AFTER_MS stayed below walking pace.
-     * Fix-driven, so a phone parked where GPS starves simply keeps running —
-     * the conservative failure mode for a safety feature. */
-    private fun stationaryTooLong(
-        speedMps: Double,
-        timestampMs: Long,
-    ): Boolean {
-        if (speedMps >= STATIONARY_SPEED_MPS) {
-            stationarySinceMs = null
-            return false
-        }
-        val since = stationarySinceMs ?: timestampMs.also { stationarySinceMs = it }
-        return timestampMs - since >= AUTO_STOP_AFTER_MS
-    }
-
     companion object {
         const val ACTION_STOP = "io.github.gdepass.twspeedtrap.STOP"
         private const val TAG = "DetectionService"
-        private const val STATIONARY_SPEED_MPS = 1.0
-        private const val AUTO_STOP_AFTER_MS = 10 * 60_000L
         private const val CHANNEL_ID = "detection"
         private const val NOTIFICATION_ID = 1
+        private const val FAILURE_NOTIFICATION_ID = 3
+        private const val AUTO_STOP_SPEECH_MS = 3_000L
     }
 }

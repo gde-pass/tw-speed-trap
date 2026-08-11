@@ -49,6 +49,10 @@
     <string name="alert_section_entered">Zone à vitesse moyenne, limite %1$d</string>
     <string name="alert_section_over">Moyenne trop élevée, ralentissez !</string>
     <string name="alert_section_exited">Fin de zone, moyenne %1$d</string>
+    <string name="alert_section_exited_estimated">Fin de zone, moyenne d’environ %1$d</string>
+    <string name="alert_auto_stopped">Aucun mouvement depuis 10 minutes, arrêt de la détection</string>
+    <string name="alert_detection_failed">Détection arrêtée à cause d’une erreur</string>
+    <string name="notif_detection_failed">Détection arrêtée : %1$s</string>
 
     <!-- Settings -->
     <string name="settings_title">Réglages</string>
@@ -58,6 +62,7 @@
     <string name="language_french">Français</string>
     <string name="language_english">English</string>
     <string name="settings_alerts">Alertes</string>
+    <string name="settings_applies_next_start">Détection en cours — les changements s’appliqueront au prochain démarrage.</string>
     <string name="settings_chime">Carillon avant les annonces</string>
     <string name="settings_lead_time">Préavis d’alerte : %1$d s avant le radar</string>
     <string name="settings_tolerance">Tolérance de vitesse : +%1$d km/h</string>

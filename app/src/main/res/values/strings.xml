@@ -51,6 +51,10 @@
     <string name="alert_section_entered">Average speed zone, limit %1$d</string>
     <string name="alert_section_over">Average too high, slow down!</string>
     <string name="alert_section_exited">End of zone, average %1$d</string>
+    <string name="alert_section_exited_estimated">End of zone, average about %1$d</string>
+    <string name="alert_auto_stopped">No movement for 10 minutes, stopping detection</string>
+    <string name="alert_detection_failed">Detection stopped because of an error</string>
+    <string name="notif_detection_failed">Detection stopped: %1$s</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -60,6 +64,7 @@
     <string name="language_french">Français</string>
     <string name="language_english">English</string>
     <string name="settings_alerts">Alerts</string>
+    <string name="settings_applies_next_start">Detection is running — changes apply the next time it starts.</string>
     <string name="settings_chime">Chime before announcements</string>
     <string name="settings_lead_time">Alert lead time: %1$d s before the camera</string>
     <string name="settings_tolerance">Speed tolerance: +%1$d km/h</string>

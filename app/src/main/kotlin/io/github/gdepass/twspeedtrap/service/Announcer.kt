@@ -53,6 +53,11 @@ class Announcer(
         TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 onInitialized()
+            } else {
+                // Engine failed to bind: every speak() would be silently
+                // swallowed. Surface it as the voice-missing warning.
+                voiceMissing = true
+                onVoiceStatus(true)
             }
         }
 

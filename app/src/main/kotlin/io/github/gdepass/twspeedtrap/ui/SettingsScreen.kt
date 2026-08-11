@@ -109,6 +109,16 @@ fun SettingsScreen(
             }
 
             SectionTitle(stringResource(R.string.settings_alerts))
+            if (detectionState.running) {
+                // The service reads settings once at start: say so instead of
+                // letting mid-ride changes look like they applied.
+                Text(
+                    stringResource(R.string.settings_applies_next_start),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
             SwitchRow(stringResource(R.string.settings_chime), settings.chimeEnabled) {
                 scope.launch { repository.setChimeEnabled(it) }
             }
