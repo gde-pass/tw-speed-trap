@@ -24,23 +24,22 @@ class StationaryDetector(
         val sinceLast = fix.timestampMs - lastTimestampMs
         val timestampAnomaly = lastTimestampMs != Long.MIN_VALUE && (sinceLast < 0 || sinceLast > GAP_RESET_MS)
         lastTimestampMs = fix.timestampMs
-        if (timestampAnomaly) {
-            restartAt(fix)
-            return false
-        }
+        if (timestampAnomaly) anchor = null
         if (fix.accuracyM > ACCURACY_IGNORE_M) return false
-        if (fix.speedMps >= SPEED_VETO_MPS && fix.accuracyM <= SPEED_VETO_MAX_ACCURACY_M) {
-            // Confidently moving (tight loops stay inside the radius): restart
-            // the clock but keep the anchor.
-            windowStartMs = fix.timestampMs
-            return false
-        }
         val current = anchor
-        if (current == null || GeoMath.distanceMeters(fix.lat, fix.lon, current.lat, current.lon) > radiusM) {
-            restartAt(fix)
-            return false
+        return when {
+            fix.speedMps >= SPEED_VETO_MPS && fix.accuracyM <= SPEED_VETO_MAX_ACCURACY_M -> {
+                // Confidently moving (tight loops stay inside the radius):
+                // restart the clock but keep the anchor.
+                windowStartMs = fix.timestampMs
+                false
+            }
+            current == null || GeoMath.distanceMeters(fix.lat, fix.lon, current.lat, current.lon) > radiusM -> {
+                restartAt(fix)
+                false
+            }
+            else -> fix.timestampMs - windowStartMs >= holdMs
         }
-        return fix.timestampMs - windowStartMs >= holdMs
     }
 
     fun reset() {

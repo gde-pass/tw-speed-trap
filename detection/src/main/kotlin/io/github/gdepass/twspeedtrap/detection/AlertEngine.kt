@@ -59,8 +59,7 @@ class AlertEngine(
         events: MutableList<AlertEvent>,
     ): Double? {
         // Section endpoints are announced by the AverageSpeedTracker, not as point cameras.
-        if (camera.type == CameraType.SECTION) return null
-        if (camera.type !in config.enabledTypes) return null
+        if (camera.type == CameraType.SECTION || camera.type !in config.enabledTypes) return null
         val distance = GeoMath.distanceMeters(fix.lat, fix.lon, camera.lat, camera.lon)
         if (camera.id in disarmed) {
             // Re-arm is checked before the bearing filter: a rider who turns
