@@ -61,11 +61,16 @@ class AlertEngine(
         // Section endpoints are announced by the AverageSpeedTracker, not as point cameras.
         if (camera.type == CameraType.SECTION) return null
         if (camera.type !in config.enabledTypes) return null
-        if (!bearingMatches(fix, camera)) return null
         val distance = GeoMath.distanceMeters(fix.lat, fix.lon, camera.lat, camera.lon)
         if (camera.id in disarmed) {
+            // Re-arm is checked before the bearing filter: a rider who turns
+            // away after firing must not leave the camera disarmed forever.
             if (distance > alertDistance * config.rearmFactor) disarmed.remove(camera.id)
-        } else if (distance <= alertDistance) {
+            // A just-passed camera is "next" only while it is still ahead.
+            return if (isAhead(fix, camera)) distance else null
+        }
+        if (!bearingMatches(fix, camera)) return null
+        if (distance <= alertDistance) {
             disarmed.add(camera.id)
             val speedKmh = (fix.speedMps * 3.6).roundToInt()
             val overLimit =
@@ -74,6 +79,16 @@ class AlertEngine(
             events.add(AlertEvent.CameraAhead(camera, distance, speedKmh, overLimit))
         }
         return distance
+    }
+
+    private fun isAhead(
+        fix: Fix,
+        camera: Camera,
+    ): Boolean {
+        if (fix.speedMps < config.minSpeedForBearingMps) return false
+        val travel = fix.bearingDeg ?: return false
+        val toCamera = GeoMath.bearingDegrees(fix.lat, fix.lon, camera.lat, camera.lon)
+        return angularDifference(travel, toCamera) <= AHEAD_HALF_PLANE_DEG
     }
 
     private fun bearingMatches(
@@ -87,6 +102,9 @@ class AlertEngine(
     }
 
     companion object {
+        /** A passed camera counts as "ahead" while within this angle of the travel bearing. */
+        const val AHEAD_HALF_PLANE_DEG = 90.0
+
         fun angularDifference(
             a: Double,
             b: Double,

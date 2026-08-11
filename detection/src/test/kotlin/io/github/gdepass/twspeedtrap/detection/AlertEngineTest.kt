@@ -102,4 +102,44 @@ class AlertEngineTest {
             )
         assertTrue(engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).isEmpty())
     }
+
+    @Test
+    fun `re-arms even when the bearing no longer matches`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // Turn east and ride 400 m away: the bearing filter no longer matches,
+        // but the camera must still re-arm (it is beyond 1.5 × alert distance).
+        val eastAway =
+            Fix(
+                lat = camera.lat,
+                lon = camera.lon + 400 * degPerMeterLon,
+                speedMps = 60 / 3.6,
+                bearingDeg = 90.0,
+                accuracyM = 5.0,
+                timestampMs = 0,
+            )
+        assertTrue(engine.onFix(eastAway).isEmpty())
+        // Looping the block and re-approaching southbound must fire again.
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size, "second approach must alert")
+    }
+
+    @Test
+    fun `camera behind the rider is not the nearest camera`() {
+        val engine = AlertEngine(listOf(camera))
+        engine.onFix(fix(camera.lat + 150 * degPerMeterLat))
+        assertTrue(engine.nearestCamera != null, "approaching a fired camera keeps the countdown")
+        engine.onFix(fix(camera.lat - 100 * degPerMeterLat))
+        assertTrue(engine.nearestCamera == null, "a passed camera must not count up behind the rider")
+    }
+
+    @Test
+    fun `fired camera still ahead keeps the countdown`() {
+        val engine = AlertEngine(listOf(camera))
+        engine.onFix(fix(camera.lat + 150 * degPerMeterLat))
+        engine.onFix(fix(camera.lat + 80 * degPerMeterLat))
+        val nearest = engine.nearestCamera
+        assertTrue(nearest != null && nearest.second in 70.0..90.0, "expected ~80 m, got $nearest")
+    }
+
+    private val degPerMeterLon = 1.0 / 101_560.0
 }
