@@ -13,13 +13,35 @@ from .dedupe import dedupe
 from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
 from .fetch import FetchError, download, extract_csv_payloads, resolve_csv_url
 from .model import Camera, Unresolved
-from .parse import SOURCE_13940, SOURCE_7320, parse_13940, parse_7320
+from .parse import (
+    SOURCE_130111,
+    SOURCE_13940,
+    SOURCE_135957,
+    SOURCE_160171,
+    SOURCE_170673,
+    SOURCE_25935,
+    SOURCE_7320,
+    parse_130111,
+    parse_13940,
+    parse_135957,
+    parse_160171,
+    parse_170673,
+    parse_25935,
+    parse_7320,
+)
 from .sections import load_sections
 
-# 13940 first: richer freeway metadata (stable equipment ids) wins dedupe ties.
+# Order = dedupe priority: national sets first (13940's stable equipment ids
+# and 7320's coverage win ties), then municipal sets richest-metadata first —
+# 130111 before 135957 so Taipei red-light twins keep bearing and speed limit.
 DATASETS = (
     (13940, parse_13940, SOURCE_13940),
     (7320, parse_7320, SOURCE_7320),
+    (130111, parse_130111, SOURCE_130111),
+    (25935, parse_25935, SOURCE_25935),
+    (135957, parse_135957, SOURCE_135957),
+    (170673, parse_170673, SOURCE_170673),
+    (160171, parse_160171, SOURCE_160171),
 )
 
 
