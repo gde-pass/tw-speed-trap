@@ -28,18 +28,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.data.CameraRepository
 import io.github.gdepass.twspeedtrap.detection.Camera
 import io.github.gdepass.twspeedtrap.detection.CameraType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.osmdroid.api.IGeoPoint
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.CopyrightOverlay
-import org.osmdroid.views.overlay.simplefastpoint.LabelledGeoPoint
 import org.osmdroid.views.overlay.simplefastpoint.SimpleFastPointOverlay
 import org.osmdroid.views.overlay.simplefastpoint.SimpleFastPointOverlayOptions
 import org.osmdroid.views.overlay.simplefastpoint.SimplePointTheme
@@ -68,11 +71,15 @@ private val LEGEND_LABELS =
 @Composable
 fun MapScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val cameras by produceState<List<Camera>>(initialValue = emptyList()) {
+    // Overlays are built off the main thread: 2500+ points and per-type paints
+    // are pure data until they are attached to the map.
+    val cameraOverlays by produceState<List<SimpleFastPointOverlay>>(initialValue = emptyList()) {
         value =
             withContext(Dispatchers.IO) {
-                runCatching { CameraRepository(context.applicationContext).loadCameras() }
-                    .getOrDefault(emptyList())
+                val cameras =
+                    runCatching { CameraRepository(context.applicationContext).loadCameras() }
+                        .getOrDefault(emptyList())
+                buildCameraOverlays(cameras)
             }
     }
     val mapView =
@@ -92,9 +99,21 @@ fun MapScreen(onBack: () -> Unit) {
             }
         }
 
-    DisposableEffect(Unit) {
-        mapView.onResume()
+    // Follow the real lifecycle: osmdroid keeps tile-download threads running
+    // unless onPause() is called, so backgrounding the app must pause the map.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                    Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                    else -> Unit
+                }
+            }
+        lifecycle.addObserver(observer)
         onDispose {
+            lifecycle.removeObserver(observer)
             mapView.onPause()
             mapView.onDetach()
         }
@@ -105,8 +124,8 @@ fun MapScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             factory = { mapView },
             update = { map ->
-                if (cameras.isNotEmpty() && map.overlays.none { it is SimpleFastPointOverlay }) {
-                    buildCameraOverlays(cameras).forEach(map.overlays::add)
+                if (cameraOverlays.isNotEmpty() && map.overlays.none { it is SimpleFastPointOverlay }) {
+                    cameraOverlays.forEach(map.overlays::add)
                     map.invalidate()
                 }
             },
@@ -157,20 +176,24 @@ private fun Legend(modifier: Modifier = Modifier) {
 /** One overlay per camera type so each type keeps its own colour; the dense
  * fixed layer is added first and the rarer types render on top of it. */
 private fun buildCameraOverlays(cameras: List<Camera>): List<SimpleFastPointOverlay> {
+    val byType = cameras.groupBy { it.type }
     val drawOrder = listOf(CameraType.FIXED) + (CameraType.entries - CameraType.FIXED)
     return drawOrder.mapNotNull { type ->
-        val ofType = cameras.filter { it.type == type }
+        val ofType = byType[type].orEmpty()
         if (ofType.isEmpty()) return@mapNotNull null
-        val points = ofType.map { LabelledGeoPoint(it.lat, it.lon, it.description) }
+        // The overlay is not clickable, so labels would never show: plain
+        // GeoPoints avoid retaining 2500 description strings.
+        val points: List<IGeoPoint> = ofType.map { GeoPoint(it.lat, it.lon) }
+        val typeColor = TYPE_COLORS.getValue(type)
         val style =
             Paint().apply {
                 style = Paint.Style.FILL
                 color =
                     android.graphics.Color.argb(
                         255,
-                        (TYPE_COLORS.getValue(type).red * 255).toInt(),
-                        (TYPE_COLORS.getValue(type).green * 255).toInt(),
-                        (TYPE_COLORS.getValue(type).blue * 255).toInt(),
+                        (typeColor.red * 255).toInt(),
+                        (typeColor.green * 255).toInt(),
+                        (typeColor.blue * 255).toInt(),
                     )
             }
         val options =
