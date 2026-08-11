@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 build-db = "twsp_pipeline.cli:main"
+dataset-watch = "twsp_pipeline.watch:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]

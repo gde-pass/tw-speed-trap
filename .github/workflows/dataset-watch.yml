@@ -1,0 +1,41 @@
+name: Dataset watch
+
+on:
+  schedule:
+    # 10:17 on the 3rd, Taiwan time (02:17 UTC) — monthly upstream check
+    - cron: "17 2 3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    name: Check upstream datasets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Run watch
+        run: uv run --project pipeline dataset-watch | tee report.md
+
+      - name: Open or update issue on findings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! grep -q '^DATASET-WATCH: FINDINGS$' report.md; then
+            echo "nothing new upstream"
+            exit 0
+          fi
+          grep -v '^DATASET-WATCH:' report.md > body.md
+          gh label create dataset-watch --description "Automated upstream dataset report" --force
+          existing=$(gh issue list --label dataset-watch --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file body.md
+          else
+            gh issue create --title "Upstream dataset changes on data.gov.tw" \
+              --body-file body.md --label dataset-watch
+          fi

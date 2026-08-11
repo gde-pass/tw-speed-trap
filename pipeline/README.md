@@ -48,3 +48,15 @@ Outputs:
 ```sh
 uv run pytest
 ```
+
+## Upstream watch
+
+```sh
+uv run dataset-watch            # or --catalog path/to/export.csv to reuse a download
+```
+
+Diffs the data.gov.tw catalog export against `data/dataset_watch.yaml`
+(new enforcement datasets, delisted sources, coordinate-less datasets
+gaining coordinates). The monthly `dataset-watch` workflow runs it and
+opens a GitHub issue on findings. After evaluating a reported dataset,
+record it in the baseline so it stops being reported.

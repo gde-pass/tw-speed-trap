@@ -45,10 +45,18 @@ skipped (re-check when upstream improves):
 - **New Taipei** — city-wide dataset 26835 is delisted; what remains is ~29
   per-district micro-datasets (a few rows each, mostly already in 7320) and a
   科技執法 list that exists only as police-website announcements, not open
-  data.
-- **Kaohsiung** — 160171 is a 2022 snapshot; the 113年 successors
-  (167749/167752/167754) are already delisted from data.gov.tw. Watch for a
-  current replacement.
+  data. The catalog sweep later surfaced **123740** (city-wide 新北市固定式
+  測速照相) — evaluate for v1.2.
+- **Kaohsiung** — 160171 is a 2022 snapshot; its successors are delisted
+  yearly. The catalog sweep found the current 115年 series (**176549, 176555,
+  176558, 176560, 176561, 177827**) — evaluate for v1.2, noting the file host
+  (data.kcg.gov.tw) is unreachable from GitHub CI, so imports would ride the
+  snapshot fallback between local refreshes.
+
+Upstream monitoring is automated: the monthly `dataset-watch` workflow diffs
+the data.gov.tw catalog against `pipeline/data/dataset_watch.yaml`, checks
+that used datasets still resolve, re-checks coordinate-less ones (Tainan
+139129), and opens a GitHub issue on findings.
 
 ## Smaller items
 
