@@ -51,7 +51,7 @@ from .parse import (
     parse_25935,
     parse_7320,
 )
-from .sections import load_sections
+from .sections import load_sections, suppress_section_hint_points
 
 # Order = dedupe priority: national sets first (13940's stable equipment ids
 # and 7320's coverage win ties), then municipal sets richest-metadata first —
@@ -174,6 +174,11 @@ def main(argv: list[str] | None = None) -> int:
     sections, section_cameras = load_sections(args.sections, today)
     if sections:
         print(f"sections: {len(sections)} curated average-speed sections")
+        deduped, hint_dropped = suppress_section_hint_points(deduped, section_cameras, SOURCE_7320)
+        if hint_dropped:
+            print(f"7320 A至B rows suppressed along curated sections: {sum(hint_dropped.values())}")
+            for key in sorted(hint_dropped):
+                print(f"  {key.split(':', 1)[1]}")
     deduped = deduped + section_cameras
 
     db_path = args.out / "cameras.db"
