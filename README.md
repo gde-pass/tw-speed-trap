@@ -45,6 +45,11 @@ derivative works with attribution:
 
 - [測速執法設置點 (dataset 7320)](https://data.gov.tw/dataset/7320) — 內政部警政署
 - [國道公路固定式測速照相地點 (dataset 13940)](https://data.gov.tw/dataset/13940)
+- [臺北市固定測速照相地點表 (dataset 130111)](https://data.gov.tw/dataset/130111)
+- [臺北市智慧管理科技執法設備資料表 (dataset 135957)](https://data.gov.tw/dataset/135957)
+- [桃園市測速照相設備地點 (dataset 25935)](https://data.gov.tw/dataset/25935)
+- [臺中市科技執法取締地點 (dataset 170673)](https://data.gov.tw/dataset/170673)
+- [高雄市111年交通局建置科技執法設備設置地點 (dataset 160171)](https://data.gov.tw/dataset/160171)
 
 資料來源：政府資料開放平臺 (data.gov.tw)。
 

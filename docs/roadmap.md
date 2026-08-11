@@ -34,14 +34,21 @@ ground truth; it both verifies the shipped zones (瑪陵 exit bearing, 蘇花改
 portal offsets, 向上路 中興路 end) and unlocks the whole candidates list at
 the bottom of `sections.yaml`.
 
-## Municipal dataset parsers (v1.1)
+## Municipal dataset parsers (shipped in v1.1)
 
-Taichung's 科技執法 dataset (170673) alone has ~77 enforcement points absent
-from the national data, and red-light cameras exist **only** in municipal
-datasets. Add per-city parsers behind the existing dedupe, starting with
-Taichung, then Taipei (130111, 135957). Expect swapped lat/lon columns and
-text in coordinate fields — route everything through `normalize_coords` and
-the unresolved report.
+Shipped: Taichung 170673, Taipei 130111 + 135957, Taoyuan 25935, Kaohsiung
+160171 — the database's first `red_light` and `tech` points. Evaluated and
+skipped (re-check when upstream improves):
+
+- **Tainan 139129** — no coordinate columns at all, only road descriptions.
+- **Chiayi 52544** — zero points >50 m from national data.
+- **New Taipei** — city-wide dataset 26835 is delisted; what remains is ~29
+  per-district micro-datasets (a few rows each, mostly already in 7320) and a
+  科技執法 list that exists only as police-website announcements, not open
+  data.
+- **Kaohsiung** — 160171 is a 2022 snapshot; the 113年 successors
+  (167749/167752/167754) are already delisted from data.gov.tw. Watch for a
+  current replacement.
 
 ## Smaller items
 
