@@ -1,0 +1,19 @@
+# Curated average-speed (區間測速) sections.
+#
+# Entry/exit pairing is NOT machine-readable in the government datasets, and
+# there are only a few dozen sections nationally, so they are curated by hand
+# here. Coordinates must be WGS84. `length_m` is the official section length
+# (used to compute the average across GPS loss in tunnels — do not measure it
+# off the map casually). `bearing_deg` is the direction of travel enforced,
+# omit for both directions.
+#
+# sections:
+#   - id: hsuehshan-sb            # stable slug, never reuse
+#     name: 國道5號雪山隧道 南向    # display only (Traditional Chinese OK)
+#     speed_limit_kmh: 90
+#     length_m: 12900
+#     entry: { lat: 24.00000, lon: 121.00000, bearing_deg: 135 }
+#     exit:  { lat: 24.00000, lon: 121.00000, bearing_deg: 135 }
+#     source: "https://…"          # where the official data came from
+#
+sections: []

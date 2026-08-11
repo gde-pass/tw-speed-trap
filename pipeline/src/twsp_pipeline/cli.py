@@ -13,6 +13,7 @@ from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
 from .fetch import download, extract_csv_payloads, resolve_csv_url
 from .model import Camera, Unresolved
 from .parse import parse_13940, parse_7320
+from .sections import load_sections
 
 # 13940 first: richer freeway metadata (stable equipment ids) wins dedupe ties.
 DATASETS = (
@@ -42,6 +43,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--geojson", type=Path, default=Path("data/cameras.geojson"))
     parser.add_argument("--assets-db", type=Path, default=None, help="also copy cameras.db here (app assets)")
     parser.add_argument("--cache", type=Path, default=None, help="cache downloads in this directory")
+    parser.add_argument(
+        "--sections",
+        type=Path,
+        default=Path("pipeline/data/sections.yaml"),
+        help="curated average-speed sections YAML",
+    )
     args = parser.parse_args(argv)
 
     today = date.today().isoformat()
@@ -61,9 +68,14 @@ def main(argv: list[str] | None = None) -> int:
     deduped, dropped = dedupe(all_cameras)
     print(f"\ndedupe: kept {len(deduped)}, dropped {sum(dropped.values())} ({dict(dropped)})")
 
+    sections, section_cameras = load_sections(args.sections, today)
+    if sections:
+        print(f"sections: {len(sections)} curated average-speed sections")
+    deduped = deduped + section_cameras
+
     db_path = args.out / "cameras.db"
     manifest_path = args.out / "manifest.json"
-    write_sqlite(deduped, db_path, today)
+    write_sqlite(deduped, db_path, today, sections)
     manifest = write_manifest(deduped, db_path, manifest_path, today)
     write_geojson(deduped, args.geojson)
     write_unresolved(all_unresolved, args.out / "unresolved.csv")

@@ -54,7 +54,7 @@ def write_geojson(cameras: list[Camera], path: Path) -> None:
         f.write("\n")
 
 
-def write_sqlite(cameras: list[Camera], path: Path, data_version: str) -> None:
+def write_sqlite(cameras: list[Camera], path: Path, data_version: str, sections: list | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.unlink(missing_ok=True)
     conn = sqlite3.connect(path)
@@ -92,6 +92,10 @@ def write_sqlite(cameras: list[Camera], path: Path, data_version: str) -> None:
                     :description, :source, :last_seen, :section_id, :section_role)
             """,
             [cam.to_dict() for cam in sorted(cameras, key=lambda c: c.id)],
+        )
+        conn.executemany(
+            "INSERT INTO sections (id, speed_limit, length_m) VALUES (?, ?, ?)",
+            [(s.id, s.speed_limit_kmh, s.length_m) for s in sorted(sections or [], key=lambda s: s.id)],
         )
         meta = {
             "schema_version": str(SCHEMA_VERSION),
