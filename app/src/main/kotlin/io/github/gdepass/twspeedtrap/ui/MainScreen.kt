@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -48,7 +49,10 @@ import io.github.gdepass.twspeedtrap.service.DetectionService
 import io.github.gdepass.twspeedtrap.service.DetectionStatus
 
 @Composable
-fun MainScreen(onOpenSettings: () -> Unit = {}) {
+fun MainScreen(
+    onOpenSettings: () -> Unit = {},
+    onOpenMap: () -> Unit = {},
+) {
     val context = LocalContext.current
     val state by DetectionStatus.state.collectAsStateWithLifecycle()
 
@@ -83,7 +87,7 @@ fun MainScreen(onOpenSettings: () -> Unit = {}) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(12.dp))
-            StatusRow(state, onOpenSettings)
+            StatusRow(state, onOpenSettings, onOpenMap)
             Spacer(Modifier.height(24.dp))
             SpeedDisplay(state)
             Spacer(Modifier.height(24.dp))
@@ -164,6 +168,7 @@ private fun PermissionChecklist(
 private fun StatusRow(
     state: DetectionStatus.UiState,
     onOpenSettings: () -> Unit,
+    onOpenMap: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -186,6 +191,13 @@ private fun StatusRow(
                     text = stringResource(R.string.cameras_loaded, state.cameraCount),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onOpenMap) {
+                Icon(
+                    imageVector = Icons.Filled.Place,
+                    contentDescription = stringResource(R.string.map_title),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onOpenSettings) {

@@ -74,4 +74,16 @@
     <string name="voice_missing_warning">No voice is installed for the selected language. Alerts may be silent.</string>
     <string name="voice_install">Install voice data</string>
     <string name="voice_open_tts_settings">Open text-to-speech settings</string>
+
+    <!-- Map + About -->
+    <string name="map_title">Camera map</string>
+    <string name="about_title">About</string>
+    <string name="about_version">App version %1$s</string>
+    <string name="about_attribution_title">Data attribution</string>
+    <string name="about_attribution_body">Camera locations come from Taiwanese government open data (data.gov.tw), datasets 7320 測速執法設置點 and 13940 國道公路固定式測速照相地點, released under the Open Government Data License v1.0 (政府資料開放授權條款—第1版).</string>
+    <string name="about_data_license">View the data license</string>
+    <string name="about_code_title">Code and map</string>
+    <string name="about_license">The app code is open source under the MIT license.</string>
+    <string name="about_osm">Map tiles © OpenStreetMap contributors.</string>
+    <string name="about_repo">Source code on GitHub</string>
 </resources>

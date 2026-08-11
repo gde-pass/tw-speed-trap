@@ -72,4 +72,16 @@
     <string name="voice_missing_warning">Aucune voix n’est installée pour la langue choisie. Les alertes peuvent être muettes.</string>
     <string name="voice_install">Installer les données de voix</string>
     <string name="voice_open_tts_settings">Ouvrir les réglages de synthèse vocale</string>
+
+    <!-- Map + About -->
+    <string name="map_title">Carte des radars</string>
+    <string name="about_title">À propos</string>
+    <string name="about_version">Version de l’application %1$s</string>
+    <string name="about_attribution_title">Attribution des données</string>
+    <string name="about_attribution_body">Les positions des radars proviennent des données ouvertes du gouvernement taïwanais (data.gov.tw), jeux de données 7320 測速執法設置點 et 13940 國道公路固定式測速照相地點, publiés sous la licence Open Government Data License v1.0 (政府資料開放授權條款—第1版).</string>
+    <string name="about_data_license">Voir la licence des données</string>
+    <string name="about_code_title">Code et carte</string>
+    <string name="about_license">Le code de l’application est open source sous licence MIT.</string>
+    <string name="about_osm">Fonds de carte © les contributeurs d’OpenStreetMap.</string>
+    <string name="about_repo">Code source sur GitHub</string>
 </resources>

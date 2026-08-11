@@ -55,7 +55,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onOpenAbout: () -> Unit = {},
+) {
     val context = LocalContext.current
     val activity = LocalActivity.current
     val repository = remember { SettingsRepository(context.applicationContext) }
@@ -202,6 +205,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = onOpenAbout) {
+                Text(stringResource(R.string.about_title))
+            }
             Spacer(Modifier.height(24.dp))
         }
     }

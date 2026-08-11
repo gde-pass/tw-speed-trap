@@ -9,7 +9,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
+import io.github.gdepass.twspeedtrap.ui.AboutScreen
 import io.github.gdepass.twspeedtrap.ui.MainScreen
+import io.github.gdepass.twspeedtrap.ui.MapScreen
 import io.github.gdepass.twspeedtrap.ui.SettingsScreen
 import io.github.gdepass.twspeedtrap.ui.theme.TwSpeedTrapTheme
 import io.github.gdepass.twspeedtrap.util.LocaleOverride
@@ -31,10 +33,22 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 NavHost(navController = navController, startDestination = "main") {
                     composable("main") {
-                        MainScreen(onOpenSettings = { navController.navigate("settings") })
+                        MainScreen(
+                            onOpenSettings = { navController.navigate("settings") },
+                            onOpenMap = { navController.navigate("map") },
+                        )
                     }
                     composable("settings") {
-                        SettingsScreen(onBack = { navController.popBackStack() })
+                        SettingsScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenAbout = { navController.navigate("about") },
+                        )
+                    }
+                    composable("map") {
+                        MapScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable("about") {
+                        AboutScreen(onBack = { navController.popBackStack() })
                     }
                 }
             }

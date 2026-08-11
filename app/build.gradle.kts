@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.androidx.work.runtime)
     implementation(libs.okhttp)
+    implementation(libs.osmdroid)
 
     testImplementation(libs.junit4)
 }
