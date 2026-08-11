@@ -22,19 +22,107 @@ not published on Google Play.
 - No ads, no analytics, no account. Location never leaves the phone; the
   only network traffic is the database update check.
 
-## Install (friends)
+## How to install
 
-1. Install [Obtainium](https://github.com/ImranR98/Obtainium/releases) —
-   it auto-updates apps straight from GitHub Releases.
-2. In Obtainium: **Add App** → paste `https://github.com/gde-pass/tw-speed-trap`
-   → leave "Include prereleases" **off** → Add. (Or import `.obtainium.json`
-   from this repo.)
-3. Open TW SpeedTrap and follow the four onboarding steps — **do not skip
-   the battery-optimisation step**; it is what keeps alerts alive with the
-   screen off.
+The app is not on Google Play. Install it once through
+[Obtainium](https://github.com/ImranR98/Obtainium) and it will update itself
+from this repo's GitHub Releases from then on.
 
-Direct download: grab `tw-speed-trap-vX.Y.Z.apk` from
-[Releases](https://github.com/gde-pass/tw-speed-trap/releases) and sideload.
+(In a hurry? Direct download: grab `tw-speed-trap-vX.Y.Z.apk` from
+[Releases](https://github.com/gde-pass/tw-speed-trap/releases), sideload it,
+then jump to step 3 — but you won't get app updates automatically.)
+
+### 1. Install Obtainium
+
+1. On the phone, open
+   [Obtainium's latest release](https://github.com/ImranR98/Obtainium/releases/latest)
+   and download **`app-arm64-v8a-release.apk`** (right for almost every
+   modern phone).
+2. Open the downloaded file. If Android asks, allow your browser to
+   *install unknown apps* — that permission prompt appears once.
+3. Open Obtainium and dismiss its welcome notes.
+
+### 2. Add TW SpeedTrap in Obtainium
+
+1. Tap **Add** (bottom right), paste
+   `https://github.com/gde-pass/tw-speed-trap` into **App source URL**, and
+   leave **Include prereleases OFF** (the `data` prerelease is the camera
+   database, not an app). Tap the **+**.
+2. The app page appears showing the latest version. Tap **Install**
+   (bottom right), let Obtainium download the APK, and confirm the system
+   dialog. (First time only: allow Obtainium to *install unknown apps*.)
+
+<p>
+  <img src="docs/install/01-obtainium-add-url.png" width="260" alt="Obtainium Add app screen with the repo URL pasted and Include prereleases off">
+  <img src="docs/install/02-obtainium-app-page.png" width="260" alt="Obtainium app page for tw-speed-trap showing the latest version and the Install button">
+  <img src="docs/install/03-confirm-install.png" width="260" alt="Android system dialog asking to install TW SpeedTrap">
+</p>
+
+### 3. First launch — grant the permissions
+
+Open TW SpeedTrap. The main screen walks you through each permission with a
+card; the **Start detection** button unlocks as you go.
+
+1. **Location access** → tap *Grant location*, then choose **Precise** and
+   **While using the app**.
+
+<p>
+  <img src="docs/install/04-onboarding-location.png" width="260" alt="TW SpeedTrap first-launch screen with the Location access card">
+  <img src="docs/install/05-location-dialog.png" width="260" alt="Android location dialog with Precise selected and While using the app highlighted">
+</p>
+
+2. **Background location** → tap *Allow all the time* and pick
+   **Allow all the time** on the system page that opens. This is what keeps
+   alerts working with the screen off or while Google Maps is in front.
+3. **Notifications** (Android 13 and newer only) → allow them; the
+   persistent notification is how you see detection is alive.
+4. **Battery optimisation** → tap *Disable optimisation* and confirm
+   **Allow**. **Do not skip this step** — Android silently kills GPS apps
+   when the screen is off unless they are exempted, and that is the
+   number-one cause of missed alerts.
+
+<p>
+  <img src="docs/install/06-onboarding-background-battery.png" width="260" alt="Background location and Battery optimisation cards">
+  <img src="docs/install/07-background-allow-all-the-time.png" width="260" alt="System location permission page with Allow all the time">
+  <img src="docs/install/08-battery-exemption.png" width="260" alt="System dialog asking to let the app always run in background">
+</p>
+
+When every card is gone, the app is ready — tap **Start detection** before
+riding and you're done.
+
+<p>
+  <img src="docs/install/09-ready.png" width="260" alt="Main screen with all permissions granted and Start detection enabled">
+</p>
+
+### 4. Settings worth a look
+
+Open the gear icon (top right):
+
+- **Language** — Français / English / system default.
+- **Alert lead time** and **speed tolerance** — how many seconds before a
+  camera the voice fires, and how much over the limit is tolerated before
+  the "slow down" warning (+10 km/h matches Taiwan's enforcement margin).
+- **Stop detection after 10 min stationary** — optional auto-stop for
+  forgetful riders; it announces itself before stopping.
+- **Start detection when Bluetooth connects** — optional auto-start when
+  your helmet intercom (or any Bluetooth device) connects; grant the
+  Bluetooth permission when the settings row asks for it.
+- **Announced camera types** — pick which camera families speak.
+- **Automatic weekly update** — the camera database refreshes itself over
+  Wi-Fi by default; no app update needed for new cameras.
+
+Settings changed while detection is running apply the next time it starts —
+the screen says so when that's the case.
+
+<p>
+  <img src="docs/install/10-settings.png" width="260" alt="Settings screen with alert options, auto start and stop toggles, and announced camera types">
+</p>
+
+### Updating later
+
+Obtainium notifies you when a new app version is released (one tap to
+update). The camera database updates itself weekly in the background — you
+never need to reinstall anything for new cameras.
 
 ## Data source and attribution
 

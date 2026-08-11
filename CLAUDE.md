@@ -25,4 +25,4 @@
 
 ## Tooling quirks
 - The rtk hook sometimes mangles grep/head output — fall back to `python3 -c` one-liners for text extraction
-- `pipeline/src/twsp_pipeline/watch.py` contains literal `﻿` escape sequences that defeat the Edit tool's matcher — edit that file via a python script
+- `pipeline/src/twsp_pipeline/watch.py` contains literal `\ufeff` escape sequences that defeat the Edit tool's matcher — edit that file via a python script
