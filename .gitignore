@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Signing — the keystore must NEVER be committed
+*.jks
+*.keystore
+keystore.properties
+
+# IDEA / Android Studio
+.idea/
+*.iml
+.kotlin/
+
+# Python (pipeline)
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+pipeline/out/
+
+# macOS
+.DS_Store
