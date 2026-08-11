@@ -9,14 +9,20 @@ on:
 permissions:
   contents: write
 
+# A dispatch overlapping the cron (or two dispatches) must not race the
+# push/upload steps against each other.
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
 jobs:
   update:
     name: Rebuild camera database
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
       - name: Run pipeline
         # --project (not --directory): keep the repo root as cwd so the
@@ -51,7 +57,20 @@ jobs:
             echo "snapshot unchanged, nothing to commit"
           else
             git commit -m "data: update camera database ($(jq -r .data_version pipeline/out/manifest.json), $(jq -r .count pipeline/out/manifest.json) cameras)"
-            git push
+            # The pipeline runs for minutes; main may have moved (this cost a
+            # weekly update once). Rebase and retry; -X theirs keeps the
+            # freshly regenerated data files on conflict.
+            for attempt in 1 2 3; do
+              if git push; then
+                break
+              fi
+              echo "push rejected (attempt $attempt); rebasing onto latest main"
+              git pull --rebase -X theirs origin main
+              if [ "$attempt" = 3 ]; then
+                echo "::error::could not push after 3 rebase attempts"
+                exit 1
+              fi
+            done
           fi
 
       - name: Publish release assets

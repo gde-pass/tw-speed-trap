@@ -10,17 +10,25 @@ permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: dataset-watch
+  cancel-in-progress: false
+
 jobs:
   watch:
     name: Check upstream datasets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
       - name: Run watch
-        run: uv run --project pipeline dataset-watch | tee report.md
+        # pipefail: a crash inside dataset-watch must fail this step, not
+        # vanish behind tee's exit code as a green "nothing new" run.
+        run: |
+          set -o pipefail
+          uv run --project pipeline dataset-watch | tee report.md
 
       - name: Open or update issue on findings
         env:
@@ -32,8 +40,10 @@ jobs:
           fi
           grep -v '^DATASET-WATCH:' report.md > body.md
           gh label create dataset-watch --description "Automated upstream dataset report" --force
-          existing=$(gh issue list --label dataset-watch --state open --json number --jq '.[0].number')
-          if [ -n "$existing" ]; then
+          # gh may print the literal string "null" for an empty result;
+          # commenting on issue "null" would fail the first findings run.
+          existing=$(gh issue list --label dataset-watch --state open --json number --jq '.[0].number' || true)
+          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
             gh issue comment "$existing" --body-file body.md
           else
             gh issue create --title "Upstream dataset changes on data.gov.tw" \
