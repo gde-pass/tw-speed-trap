@@ -207,6 +207,8 @@ sections:
 
 # ── CANDIDATES — known zones that did NOT pass verification; do not enable
 # without resolving the noted problem. Coordinates are the 7320 row witness.
+# The planned in-app gantry-marking feature (docs/roadmap.md) is the intended
+# way to resolve these: one tap at each gantry while riding = ground truth.
 #
 #  台9  東澳隧道 北向 110K960→108K224, limit 70, witness 24.536793,121.836655
 #       → zone (2736 m) is shorter than the OSM bore (3360 m): gantries sit

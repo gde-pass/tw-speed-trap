@@ -75,7 +75,8 @@ to a GitHub Release.
   dedupe → SQLite/GeoJSON/manifest. See [pipeline/README.md](pipeline/README.md)
 - `data/` — committed GeoJSON snapshot of the camera database
 - `docs/` — [signing](docs/signing.md), [mock-location
-  testing](docs/mock-location.md), [ride QA checklist](docs/qa-checklist.md)
+  testing](docs/mock-location.md), [ride QA checklist](docs/qa-checklist.md),
+  [roadmap](docs/roadmap.md)
 - `.github/workflows/` — CI, weekly data update, tag-triggered release
 
 The camera database is refreshed weekly by CI; when the data changes, the
