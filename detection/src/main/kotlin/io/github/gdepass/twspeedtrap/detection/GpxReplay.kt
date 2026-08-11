@@ -21,8 +21,12 @@ object GpxReplay {
         val document =
             DocumentBuilderFactory
                 .newInstance()
-                .apply { isNamespaceAware = true }
-                .newDocumentBuilder()
+                .apply {
+                    isNamespaceAware = true
+                    // This ships in the jar as public API: refuse DOCTYPEs so a
+                    // hostile GPX cannot use XXE/entity-expansion tricks.
+                    setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                }.newDocumentBuilder()
                 .parse(input)
         val points = document.getElementsByTagNameNS("*", "trkpt")
         return buildList {
