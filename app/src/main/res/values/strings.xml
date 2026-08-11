@@ -83,7 +83,7 @@
     <string name="about_title">About</string>
     <string name="about_version">App version %1$s</string>
     <string name="about_attribution_title">Data attribution</string>
-    <string name="about_attribution_body">Camera locations come from Taiwanese government open data (data.gov.tw), released under the Open Government Data License v1.0 (政府資料開放授權條款—第1版): datasets 7320 測速執法設置點, 13940 國道公路固定式測速照相地點, 130111 臺北市固定測速照相地點表, 135957 臺北市智慧管理科技執法設備資料表, 25935 桃園市測速照相設備地點, 170673 臺中市科技執法取締地點, and the Kaohsiung 科技執法 datasets 176549, 176555, 176558, 176560, 176561 and 177827.</string>
+    <string name="about_attribution_body">Camera locations come from Taiwanese government open data (data.gov.tw), released under the Open Government Data License v1.0 (政府資料開放授權條款—第1版): national datasets 7320 測速執法設置點 and 13940 國道公路固定式測速照相地點, plus municipal datasets from Taipei (130111, 135957), Taoyuan (25935), Taichung (170673), Kaohsiung (176549, 176555, 176558, 176560, 176561, 177827), Changhua (172905), Yunlin (178085, 178086), Keelung (178159) and Penghu (156415, 172940).</string>
     <string name="about_data_license">View the data license</string>
     <string name="about_code_title">Code and map</string>
     <string name="about_license">The app code is open source under the MIT license.</string>

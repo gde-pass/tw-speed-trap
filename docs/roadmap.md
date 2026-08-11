@@ -53,6 +53,15 @@ skipped (re-check when upstream improves):
   from GitHub CI, so these ride the snapshot fallback between local refreshes
   — refresh by running `build-db` locally and committing the assets db.
 
+The 2026-08 county sweep closed out the remaining catalog candidates:
+integrated 彰化 172905, 雲林 178085/178086, 基隆 178159, 澎湖 156415/172940
+(+80 points after dedupe). Unusable and recorded in the watch baseline:
+屏東 144578 / 苗栗 172178 / 高雄 mobile 152480 (no coordinates), 屏東 144579
+and 雪山隧道 100857 (section lists without coordinates — copied into
+`sections.yaml` candidates), 南投 38357/176021 (host drops connections),
+嘉義縣 178140/178143 (TLS handshake too weak for modern OpenSSL), 臺東
+177486 (no CSV resource).
+
 Upstream monitoring is automated: the monthly `dataset-watch` workflow diffs
 the data.gov.tw catalog against `pipeline/data/dataset_watch.yaml`, checks
 that used datasets still resolve, re-checks coordinate-less ones (Tainan

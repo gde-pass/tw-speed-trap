@@ -24,6 +24,12 @@ SOURCE_176558 = "gov.tw:176558"
 SOURCE_176560 = "gov.tw:176560"
 SOURCE_176561 = "gov.tw:176561"
 SOURCE_177827 = "gov.tw:177827"
+SOURCE_172905 = "gov.tw:172905"
+SOURCE_178085 = "gov.tw:178085"
+SOURCE_178086 = "gov.tw:178086"
+SOURCE_178159 = "gov.tw:178159"
+SOURCE_156415 = "gov.tw:156415"
+SOURCE_172940 = "gov.tw:172940"
 
 
 class SchemaError(RuntimeError):
@@ -426,3 +432,138 @@ def parse_177827(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
     """Kaohsiung rental-vehicle pedestrian-yield enforcement (高雄市115年租賃式
     車不停讓行人科技執法地點)."""
     return _parse_kaohsiung_tech(text, today, SOURCE_177827, "設置位置")
+
+
+def _parse_county_standard(
+    text: str, today: str, source: str, place_col: str, items_col: str
+) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Shared county open-data shape (彰化/基隆/澎湖): 13940-family Chinese
+    columns, with per-county suffix variations on the location and items
+    column names. Speed-measuring rows stay `fixed` so they dedupe against
+    their national 7320 twins (彰化's list is byte-identical positions)."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    _require_columns(
+        reader.fieldnames, {"縣市", "行政區", place_col, items_col, "座標緯度", "座標經度", "拍攝方向", "速限"}, source
+    )
+    dataset_id = source.rsplit(":", 1)[-1]
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        items = (row.get(items_col) or "").strip()
+        kind = (row.get("科技執法種類") or "").strip()
+        if _is_section(items) or _is_section(kind):
+            stats[f"{dataset_id}_sections_excluded"] += 1
+            continue
+        if "超速" in items or "測速" in items:
+            cam_type = "fixed"
+        elif "闖紅燈" in items:
+            cam_type = "red_light"
+        else:
+            cam_type = "tech"
+        try:
+            lat, lon = normalize_coords(row.get("座標緯度"), row.get("座標經度"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(source, str(e), dict(row)))
+            continue
+        description = (row.get(place_col) or "").strip()
+        area = (row.get("行政區") or "").strip()
+        if area and area not in description:
+            description = f"{area} {description}".strip()
+        bearing = parse_bearing(row.get("拍攝方向"))
+        stats[f"{dataset_id}_type:{cam_type}"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(source, lat, lon, bearing),
+                lat=lat,
+                lon=lon,
+                type=cam_type,
+                speed_limit=parse_limit(row.get("速限")),
+                bearing=bearing,
+                city=(row.get("縣市") or "").strip(),
+                description=description,
+                source=source,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats
+
+
+def parse_172905(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Changhua tech enforcement (彰化縣警察局固定式科技執法設備設置地點)."""
+    return _parse_county_standard(text, today, SOURCE_172905, "設置地點", "取締項目")
+
+
+def parse_178159(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Keelung tech enforcement (基隆市科技執法取締地點)."""
+    return _parse_county_standard(text, today, SOURCE_178159, "設置地點(路口或路段)", '取締項目(以"、"分隔)')
+
+
+def parse_156415(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Penghu fixed cameras (澎湖縣固定測速照相設置地點表)."""
+    return _parse_county_standard(text, today, SOURCE_156415, "設置地點(路口或路段)", '取締項目(以"、"分隔)')
+
+
+def parse_172940(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Penghu tech enforcement (澎湖縣科技執法地點); overlaps 156415 at shared
+    intersections — both classify speed rows `fixed`, so dedupe collapses them."""
+    return _parse_county_standard(text, today, SOURCE_172940, "設置地點(路口或路段)", '取締項目(以"、"分隔)')
+
+
+def _parse_yunlin(text: str, today: str, source: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Yunlin lists (1150715 雲林縣警察局…一覽表). The English header row is a
+    veneer: the first data row repeats the real header in Chinese (skipped,
+    like 7320), Latitude/Longitude are genuine, and Remark holds the police
+    branch."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    _require_columns(reader.fieldnames, {"project", "location", "direction", "speed", "ban", "Latitude", "Longitude"}, source)
+    dataset_id = source.rsplit(":", 1)[-1]
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        if (row.get("location") or "").strip() == "設置地點":
+            stats[f"{dataset_id}_skipped_zh_header"] += 1
+            continue
+        items = (row.get("ban") or "").strip()
+        if _is_section(items):
+            stats[f"{dataset_id}_sections_excluded"] += 1
+            continue
+        if "超速" in items or "測速" in items:
+            cam_type = "fixed"
+        elif "闖紅燈" in items:
+            cam_type = "red_light"
+        else:
+            cam_type = "tech"
+        try:
+            lat, lon = normalize_coords(row.get("Latitude"), row.get("Longitude"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(source, str(e), dict(row)))
+            continue
+        bearing = parse_bearing(row.get("direction"))
+        stats[f"{dataset_id}_type:{cam_type}"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(source, lat, lon, bearing),
+                lat=lat,
+                lon=lon,
+                type=cam_type,
+                speed_limit=parse_limit(row.get("speed")),
+                bearing=bearing,
+                city="雲林縣",
+                description=(row.get("location") or "").strip(),
+                source=source,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats
+
+
+def parse_178085(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Yunlin fixed speed cameras (1150715 雲林縣警察局固定式測速照相設備)."""
+    return _parse_yunlin(text, today, SOURCE_178085)
+
+
+def parse_178086(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Yunlin tech enforcement (1150715 雲林縣警察局科技執法設備)."""
+    return _parse_yunlin(text, today, SOURCE_178086)

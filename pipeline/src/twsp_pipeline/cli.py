@@ -9,12 +9,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .decode import decode_bytes
-from .dedupe import dedupe
+from .dedupe import collapse_id_duplicates, dedupe
 from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
 from .fetch import FetchError, download, extract_csv_payloads, resolve_csv_url
 from .model import Camera, Unresolved
 from .parse import (
     SOURCE_130111,
+    SOURCE_156415,
+    SOURCE_172905,
+    SOURCE_172940,
+    SOURCE_178085,
+    SOURCE_178086,
+    SOURCE_178159,
     SOURCE_13940,
     SOURCE_135957,
     SOURCE_170673,
@@ -28,6 +34,12 @@ from .parse import (
     SOURCE_7320,
     parse_130111,
     parse_13940,
+    parse_156415,
+    parse_172905,
+    parse_172940,
+    parse_178085,
+    parse_178086,
+    parse_178159,
     parse_135957,
     parse_170673,
     parse_176549,
@@ -58,6 +70,12 @@ DATASETS = (
     (176561, parse_176561, SOURCE_176561),
     (176555, parse_176555, SOURCE_176555),
     (177827, parse_177827, SOURCE_177827),
+    (172905, parse_172905, SOURCE_172905),
+    (178085, parse_178085, SOURCE_178085),
+    (178086, parse_178086, SOURCE_178086),
+    (178159, parse_178159, SOURCE_178159),
+    (156415, parse_156415, SOURCE_156415),
+    (172940, parse_172940, SOURCE_172940),
 )
 
 
@@ -147,8 +165,11 @@ def main(argv: list[str] | None = None) -> int:
             all_unresolved.extend(unresolved)
             stats.update(source_stats)
 
+    all_cameras, same_device = collapse_id_duplicates(all_cameras)
+    if same_device:
+        print(f"\nsame-device rows collapsed: {sum(same_device.values())} ({dict(same_device)})")
     deduped, dropped = dedupe(all_cameras)
-    print(f"\ndedupe: kept {len(deduped)}, dropped {sum(dropped.values())} ({dict(dropped)})")
+    print(f"dedupe: kept {len(deduped)}, dropped {sum(dropped.values())} ({dict(dropped)})")
 
     sections, section_cameras = load_sections(args.sections, today)
     if sections:

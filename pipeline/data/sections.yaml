@@ -233,3 +233,12 @@ sections:
 #       27.2K→28.4K 雙向 (50) & 28.9K→31.8K (50); 北118 壽山路 0K→1.2K
 #       (40); 台62甲 3號隧道→東海街 (50, 25.124674,121.77938) — all single
 #       witness coordinate, no independent anchors yet.
+#
+# From the 2026-08 county sweep (datasets 144579 屏東, 100857 雪山隧道 —
+# both publish descriptions/km-markers only, no coordinates):
+#  台1  戰備跑道 429.5K→433K 南向 / 433K→429.5K 北向 (limit 70) — 屏東
+#  台26 尖山段 8.4K→13.2K 南向 / 13.7K→8.5K 北向 (limit 70) — 屏東
+#  台9  草埔森永隧道 434.4K→437.2K 南向 / 437.2K→434.3K 北向 (limit 70) — 屏東
+#  國道5 雪山隧道 gantry ladder at 16.9/18.3/19.7/21.1/22.5/23.9/25.3/26.7K,
+#       both directions (dataset lists per-gantry km, no coordinates; the
+#       enforced averages run between consecutive gantries).

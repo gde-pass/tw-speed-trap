@@ -55,6 +55,12 @@ derivative works with attribution:
 - [高雄市115年捷運局輕軌沿線建置科技執法設備設置地點 (dataset 176560)](https://data.gov.tw/dataset/176560)
 - [高雄市115年路口科技執法監測系統設置地點 (dataset 176561)](https://data.gov.tw/dataset/176561)
 - [高雄市115年租賃式車不停讓行人科技執法地點 (dataset 177827)](https://data.gov.tw/dataset/177827)
+- [彰化縣警察局固定式科技執法設備設置地點 (dataset 172905)](https://data.gov.tw/dataset/172905)
+- [1150715雲林縣警察局固定式測速照相設備設置地點一覽表 (dataset 178085)](https://data.gov.tw/dataset/178085)
+- [1150715雲林縣警察局科技執法設備設置地點一覽表 (dataset 178086)](https://data.gov.tw/dataset/178086)
+- [基隆市科技執法取締地點 (dataset 178159)](https://data.gov.tw/dataset/178159)
+- [澎湖縣固定測速照相設置地點表 (dataset 156415)](https://data.gov.tw/dataset/156415)
+- [澎湖縣科技執法地點 (dataset 172940)](https://data.gov.tw/dataset/172940)
 
 資料來源：政府資料開放平臺 (data.gov.tw)。
 

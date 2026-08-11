@@ -15,6 +15,12 @@ from twsp_pipeline.parse import (
     parse_176560,
     parse_176561,
     parse_177827,
+    parse_156415,
+    parse_172905,
+    parse_172940,
+    parse_178085,
+    parse_178086,
+    parse_178159,
     parse_25935,
 )
 
@@ -174,5 +180,64 @@ def test_municipal_missing_columns_fail_loudly():
         parse_177827,
     )
     for parse in parsers:
+        with pytest.raises(SchemaError):
+            parse("foo,bar\n1,2\n", "2026-08-11")
+
+
+CSV_172905 = """設備編號,縣市,行政區,科技執法種類,取締項目,設置地點,座標緯度,座標經度,拍攝方向,速限,轄區分局,備註
+3,彰化縣,彰化市,路口多功能執法,超速、闖紅燈,金馬路2段與彰新路1段路口,24.092823,120.538186,北向南,70,彰化分局,
+5,彰化縣,彰化市,路口多功能執法,闖紅燈、不停讓行人,光復路與和平路口,24.080356,120.540402,南北雙向,50,彰化分局,
+"""
+
+# Keelung uses the suffixed column names and lists one gantry per direction.
+CSV_178159 = """設備編號,縣市,行政區,科技執法種類,"取締項目(以""、""分隔)",設置地點(路口或路段),座標緯度,座標經度,拍攝方向,速限,轄區分局,備註
+1,基隆市,仁愛區,路口多功能執法,禁行車種,基隆東岸高架橋,25.1308105,121.7430319,北往南,-,交通隊,
+2,基隆市,仁愛區,路口多功能執法,禁行車種,基隆東岸高架橋,25.1308105,121.7430319,南往北,-,交通隊,
+"""
+
+# Yunlin's English header is a veneer: the first data row repeats the real
+# header in Chinese, and Remark holds the police branch.
+CSV_178085 = """project,location,direction,speed,ban,Latitude,Longitude,Remark
+A00,設置地點,拍攝方向,速限,取締項目,經緯度,經緯度,備註
+A01,雲林縣北港鎮台19線公路與145縣道路口,北向南,50,超速、闖紅燈,23.583764,120.299399,北港分局
+A02,雲林縣元長鄉160縣道15k+650m處,東西雙向,60,超速,23.655033,120.288958,虎尾分局
+A12,雲林縣虎尾鎮林森路一段與公安路口,南北雙向,50,闖紅燈 、未禮讓行人,23.70914,120.433403,虎尾分局
+"""
+
+
+def test_county_standard_parser_variants():
+    cameras, unresolved, _ = parse_172905(CSV_172905, "2026-08-11")
+    assert not unresolved
+    dual = next(cam for cam in cameras if "金馬路" in cam.description)
+    assert dual.type == "fixed"  # 超速、闖紅燈 measures speed -> dedupes vs 7320
+    assert dual.speed_limit == 70
+    assert dual.city == "彰化縣"
+    assert dual.description == "彰化市 金馬路2段與彰新路1段路口"
+    red = next(cam for cam in cameras if "光復路" in cam.description)
+    assert red.type == "red_light"
+    assert red.bearing is None  # 南北雙向
+
+    cameras, unresolved, _ = parse_178159(CSV_178159, "2026-08-11")
+    assert not unresolved
+    assert [cam.type for cam in cameras] == ["tech", "tech"]  # 禁行車種
+    assert cameras[0].speed_limit is None  # 速限 is "-"
+    assert {cameras[0].bearing, cameras[1].bearing} == {180.0, 0.0}
+    assert cameras[0].id != cameras[1].id  # per-direction gantries stay distinct
+
+
+def test_yunlin_skips_embedded_chinese_header():
+    cameras, unresolved, stats = parse_178085(CSV_178085, "2026-08-11")
+    assert not unresolved
+    assert stats["178085_skipped_zh_header"] == 1
+    assert len(cameras) == 3
+    by_desc = {cam.description: cam for cam in cameras}
+    assert by_desc["雲林縣北港鎮台19線公路與145縣道路口"].type == "fixed"
+    assert by_desc["雲林縣元長鄉160縣道15k+650m處"].speed_limit == 60
+    assert by_desc["雲林縣虎尾鎮林森路一段與公安路口"].type == "red_light"
+    assert all(cam.city == "雲林縣" for cam in cameras)
+
+
+def test_county_missing_columns_fail_loudly():
+    for parse in (parse_172905, parse_178159, parse_156415, parse_172940, parse_178085, parse_178086):
         with pytest.raises(SchemaError):
             parse("foo,bar\n1,2\n", "2026-08-11")

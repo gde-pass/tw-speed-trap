@@ -32,6 +32,26 @@ def _bearings_compatible(a: float | None, b: float | None) -> bool:
     return min(diff, 360.0 - diff) <= 45.0
 
 
+# When one source lists the same pole several times (基隆 emits one row per
+# violation category at identical position+bearing), the rows share a make_id.
+# One physical device gets one alert: keep the most informative type.
+_TYPE_PRIORITY = {"fixed": 0, "red_light": 1, "mobile": 2, "tech": 3, "other": 4}
+
+
+def collapse_id_duplicates(cameras: list[Camera]) -> tuple[list[Camera], Counter]:
+    kept: dict[str, Camera] = {}
+    dropped: Counter = Counter()
+    for cam in cameras:
+        other = kept.get(cam.id)
+        if other is None:
+            kept[cam.id] = cam
+        else:
+            loser = max(other, cam, key=lambda c: _TYPE_PRIORITY.get(c.type, 9))
+            kept[cam.id] = other if loser is cam else cam
+            dropped[f"same_device:{loser.source}:{loser.type}"] += 1
+    return list(kept.values()), dropped
+
+
 def dedupe(cameras: list[Camera], radius_m: float = RADIUS_M) -> tuple[list[Camera], Counter]:
     kept: list[Camera] = []
     dropped: Counter = Counter()

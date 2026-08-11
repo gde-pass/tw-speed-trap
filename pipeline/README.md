@@ -27,6 +27,12 @@ they change over time):
   [176560](https://data.gov.tw/dataset/176560) 捷運局輕軌沿線,
   [176561](https://data.gov.tw/dataset/176561) 路口科技執法監測系統,
   [177827](https://data.gov.tw/dataset/177827) 租賃式車不停讓行人
+- County sets: [172905](https://data.gov.tw/dataset/172905) 彰化,
+  [178085](https://data.gov.tw/dataset/178085) /
+  [178086](https://data.gov.tw/dataset/178086) 雲林,
+  [178159](https://data.gov.tw/dataset/178159) 基隆,
+  [156415](https://data.gov.tw/dataset/156415) /
+  [172940](https://data.gov.tw/dataset/172940) 澎湖
 
 Average-speed (區間測速) rows in any source are excluded from point import —
 sections are hand-curated in `data/sections.yaml` with entry/exit pairs.

@@ -1,4 +1,4 @@
-from twsp_pipeline.dedupe import dedupe
+from twsp_pipeline.dedupe import collapse_id_duplicates, dedupe
 from twsp_pipeline.model import Camera
 
 
@@ -65,3 +65,16 @@ def test_cell_boundary_still_deduped():
     b = cam("b", lat_edge + DEG_10M_LAT / 10, BASE_LON)
     kept, _ = dedupe([a, b])
     assert len(kept) == 1
+
+
+def test_collapse_id_duplicates_keeps_most_informative_type():
+    gantry = dict(lat=25.1308105, lon=121.7430319, speed_limit=None, bearing=180.0,
+                  city="基隆市", description="八堵路127巷口", source="gov.tw:178159",
+                  last_seen="2026-08-11")
+    tech = Camera(id="d3a02fa6391b", type="tech", **gantry)
+    red = Camera(id="d3a02fa6391b", type="red_light", **gantry)
+    other = Camera(id="ffffffffffff", type="tech", **gantry)
+    kept, dropped = collapse_id_duplicates([tech, red, other])
+    assert [c.id for c in kept] == ["d3a02fa6391b", "ffffffffffff"]
+    assert kept[0].type == "red_light"  # red_light beats tech for the same pole
+    assert dropped["same_device:gov.tw:178159:tech"] == 1
