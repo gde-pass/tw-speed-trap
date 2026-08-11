@@ -1,8 +1,13 @@
 package io.github.gdepass.twspeedtrap.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -120,6 +125,21 @@ fun SettingsScreen(
             ) { scope.launch { repository.setSpeedTolerance(it.toInt()) } }
             SwitchRow(stringResource(R.string.settings_auto_stop), settings.autoStopEnabled) {
                 scope.launch { repository.setAutoStopEnabled(it) }
+            }
+            // Receiving Bluetooth connect broadcasts needs BLUETOOTH_CONNECT
+            // from API 31; the toggle stays on even if denied — the user can
+            // grant it later from system settings.
+            val bluetoothPermission =
+                rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+            SwitchRow(stringResource(R.string.settings_auto_start_bt), settings.autoStartBluetoothEnabled) { enabled ->
+                if (enabled &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                }
+                scope.launch { repository.setAutoStartBluetoothEnabled(enabled) }
             }
 
             SectionTitle(stringResource(R.string.settings_camera_types))

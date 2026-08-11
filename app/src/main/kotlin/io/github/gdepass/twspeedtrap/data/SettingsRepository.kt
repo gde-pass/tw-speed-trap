@@ -27,6 +27,8 @@ data class AppSettings(
     /** Stop detection after 10 min without movement. Off by default: a long
      * break must not silently disable alerts for the ride home. */
     val autoStopEnabled: Boolean = false,
+    /** Start detection when a Bluetooth device connects (helmet intercom). */
+    val autoStartBluetoothEnabled: Boolean = false,
 ) {
     fun toEngineConfig(): EngineConfig =
         EngineConfig(
@@ -54,6 +56,7 @@ class SettingsRepository(
                 autoUpdateEnabled = prefs[KEY_AUTO_UPDATE] ?: DEFAULTS.autoUpdateEnabled,
                 wifiOnlyUpdates = prefs[KEY_WIFI_ONLY] ?: DEFAULTS.wifiOnlyUpdates,
                 autoStopEnabled = prefs[KEY_AUTO_STOP] ?: DEFAULTS.autoStopEnabled,
+                autoStartBluetoothEnabled = prefs[KEY_AUTO_START_BT] ?: DEFAULTS.autoStartBluetoothEnabled,
             )
         }
 
@@ -74,6 +77,8 @@ class SettingsRepository(
 
     suspend fun setAutoStopEnabled(value: Boolean) = context.dataStore.edit { it[KEY_AUTO_STOP] = value }
 
+    suspend fun setAutoStartBluetoothEnabled(value: Boolean) = context.dataStore.edit { it[KEY_AUTO_START_BT] = value }
+
     companion object {
         private val DEFAULTS = AppSettings()
         private val KEY_DISTANCE_MULTIPLIER = doublePreferencesKey("distance_multiplier")
@@ -84,5 +89,6 @@ class SettingsRepository(
         private val KEY_AUTO_UPDATE = booleanPreferencesKey("auto_update")
         private val KEY_WIFI_ONLY = booleanPreferencesKey("wifi_only_updates")
         private val KEY_AUTO_STOP = booleanPreferencesKey("auto_stop_stationary")
+        private val KEY_AUTO_START_BT = booleanPreferencesKey("auto_start_bluetooth")
     }
 }

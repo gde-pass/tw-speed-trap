@@ -58,6 +58,10 @@
     <string name="settings_lead_time">Alert lead time: %1$d s before the camera</string>
     <string name="settings_tolerance">Speed tolerance: +%1$d km/h</string>
     <string name="settings_auto_stop">Stop detection after 10 min stationary</string>
+    <string name="settings_auto_start_bt">Start detection when Bluetooth connects</string>
+    <string name="notif_autostart_channel">Auto-start</string>
+    <string name="notif_autostart_title">Bluetooth connected</string>
+    <string name="notif_autostart_text">Tap to start detection</string>
     <string name="settings_camera_types">Announced camera types</string>
     <string name="type_fixed">Fixed cameras</string>
     <string name="type_mobile">Mobile enforcement spots</string>
