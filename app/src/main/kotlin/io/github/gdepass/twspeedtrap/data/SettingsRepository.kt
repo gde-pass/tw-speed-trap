@@ -24,6 +24,9 @@ data class AppSettings(
     val languageTag: String = "system",
     val autoUpdateEnabled: Boolean = true,
     val wifiOnlyUpdates: Boolean = true,
+    /** Stop detection after 10 min without movement. Off by default: a long
+     * break must not silently disable alerts for the ride home. */
+    val autoStopEnabled: Boolean = false,
 ) {
     fun toEngineConfig(): EngineConfig =
         EngineConfig(
@@ -50,6 +53,7 @@ class SettingsRepository(
                 languageTag = prefs[KEY_LANGUAGE] ?: DEFAULTS.languageTag,
                 autoUpdateEnabled = prefs[KEY_AUTO_UPDATE] ?: DEFAULTS.autoUpdateEnabled,
                 wifiOnlyUpdates = prefs[KEY_WIFI_ONLY] ?: DEFAULTS.wifiOnlyUpdates,
+                autoStopEnabled = prefs[KEY_AUTO_STOP] ?: DEFAULTS.autoStopEnabled,
             )
         }
 
@@ -68,6 +72,8 @@ class SettingsRepository(
 
     suspend fun setWifiOnlyUpdates(value: Boolean) = context.dataStore.edit { it[KEY_WIFI_ONLY] = value }
 
+    suspend fun setAutoStopEnabled(value: Boolean) = context.dataStore.edit { it[KEY_AUTO_STOP] = value }
+
     companion object {
         private val DEFAULTS = AppSettings()
         private val KEY_DISTANCE_MULTIPLIER = doublePreferencesKey("distance_multiplier")
@@ -77,5 +83,6 @@ class SettingsRepository(
         private val KEY_LANGUAGE = stringPreferencesKey("language_tag")
         private val KEY_AUTO_UPDATE = booleanPreferencesKey("auto_update")
         private val KEY_WIFI_ONLY = booleanPreferencesKey("wifi_only_updates")
+        private val KEY_AUTO_STOP = booleanPreferencesKey("auto_stop_stationary")
     }
 }

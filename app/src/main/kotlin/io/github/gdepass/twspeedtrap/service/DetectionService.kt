@@ -32,6 +32,7 @@ class DetectionService : LifecycleService() {
     private var announcer: Announcer? = null
     private var chimeEnabled = true
     private lateinit var localized: Context
+    private var stationarySinceMs: Long? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -84,6 +85,11 @@ class DetectionService : LifecycleService() {
                 DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
 
                 LocationSource(this@DetectionService).fixes().collect { fix ->
+                    if (settings.autoStopEnabled && stationaryTooLong(fix.speedMps, fix.timestampMs)) {
+                        Log.i(TAG, "stationary for ${AUTO_STOP_AFTER_MS / 60_000} min — stopping detection")
+                        stopDetection()
+                        return@collect
+                    }
                     engine.onFix(fix).forEach(::announce)
                     val nearest = engine.nearestCamera
                     val speedKmh = (fix.speedMps * 3.6).roundToInt()
@@ -145,6 +151,7 @@ class DetectionService : LifecycleService() {
     private fun stopDetection() {
         detectionJob?.cancel()
         detectionJob = null
+        stationarySinceMs = null
         announcer?.release()
         announcer = null
         DetectionStatus.reset()
@@ -211,9 +218,26 @@ class DetectionService : LifecycleService() {
 
     private fun roundForSpeech(distanceM: Double): Int = ((distanceM / 50.0).roundToInt() * 50).coerceAtLeast(50)
 
+    /** True once every fix for AUTO_STOP_AFTER_MS stayed below walking pace.
+     * Fix-driven, so a phone parked where GPS starves simply keeps running —
+     * the conservative failure mode for a safety feature. */
+    private fun stationaryTooLong(
+        speedMps: Double,
+        timestampMs: Long,
+    ): Boolean {
+        if (speedMps >= STATIONARY_SPEED_MPS) {
+            stationarySinceMs = null
+            return false
+        }
+        val since = stationarySinceMs ?: timestampMs.also { stationarySinceMs = it }
+        return timestampMs - since >= AUTO_STOP_AFTER_MS
+    }
+
     companion object {
         const val ACTION_STOP = "io.github.gdepass.twspeedtrap.STOP"
         private const val TAG = "DetectionService"
+        private const val STATIONARY_SPEED_MPS = 1.0
+        private const val AUTO_STOP_AFTER_MS = 10 * 60_000L
         private const val CHANNEL_ID = "detection"
         private const val NOTIFICATION_ID = 1
     }

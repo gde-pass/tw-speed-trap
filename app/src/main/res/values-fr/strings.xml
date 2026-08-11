@@ -55,6 +55,7 @@
     <string name="settings_chime">Carillon avant les annonces</string>
     <string name="settings_lead_time">Préavis d’alerte : %1$d s avant le radar</string>
     <string name="settings_tolerance">Tolérance de vitesse : +%1$d km/h</string>
+    <string name="settings_auto_stop">Arrêter la détection après 10 min à l’arrêt</string>
     <string name="settings_camera_types">Types de radars annoncés</string>
     <string name="type_fixed">Radars fixes</string>
     <string name="type_mobile">Contrôles mobiles</string>

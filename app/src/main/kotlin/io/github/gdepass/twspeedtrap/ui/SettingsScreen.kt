@@ -118,6 +118,9 @@ fun SettingsScreen(
                 range = 0f..20f,
                 steps = 19,
             ) { scope.launch { repository.setSpeedTolerance(it.toInt()) } }
+            SwitchRow(stringResource(R.string.settings_auto_stop), settings.autoStopEnabled) {
+                scope.launch { repository.setAutoStopEnabled(it) }
+            }
 
             SectionTitle(stringResource(R.string.settings_camera_types))
             CameraType.entries.forEach { type ->
