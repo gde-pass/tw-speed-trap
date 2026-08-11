@@ -5,7 +5,7 @@ import shutil
 import sqlite3
 import sys
 from collections import Counter
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .decode import decode_bytes
@@ -80,7 +80,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    today = date.today().isoformat()
+    # Minute precision so a same-day data fix still reads as newer to
+    # installed apps (comparison is lexicographic; content_hash, which gates
+    # publishing, excludes last_seen so this never causes spurious releases).
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
     all_cameras: list[Camera] = []
     all_unresolved: list[Unresolved] = []
     stats: Counter = Counter()

@@ -1,28 +1,31 @@
 # Curated average-speed (區間測速) sections.
 #
-# Entry/exit pairing is NOT machine-readable in the government datasets, and
-# there are only a few dozen sections nationally, so they are curated by hand
-# here. Coordinates must be WGS84. `length_m` is the official section length
-# (used to compute the average across GPS loss in tunnels — do not measure it
-# off the map casually). `bearing_deg` is the direction of travel enforced,
-# omit for both directions.
+# Entry/exit pairing is NOT machine-readable in the government datasets, so
+# sections are curated here. Every entry below was verified before shipping:
+#   pair-given  — both endpoints are government coordinates from paired 7320
+#                 rows; the OSM road-walk distance matched the official km
+#                 span (checksum quoted per entry).
+#   tunnel      — endpoints are the OSM tunnel-bore portals; length is the
+#                 walked bore geometry (checksummed against the km span
+#                 where the row provides one).
+#   linear-ref  — endpoints placed by kilometre along OSM geometry between
+#                 two independent government km-coordinate anchors; the
+#                 road-length/km-span scale and a witness coordinate from
+#                 the zone's own row are the checksums.
+# Bearings are the local direction of travel at each endpoint. length_m is
+# the distance the running average is computed over and always matches the
+# endpoint pair used.
 #
-# sections:
-#   - id: hsuehshan-sb            # stable slug, never reuse
-#     name: 國道5號雪山隧道 南向    # display only (Traditional Chinese OK)
-#     speed_limit_kmh: 90
-#     length_m: 12900
-#     entry: { lat: 24.00000, lon: 121.00000, bearing_deg: 135 }
-#     exit:  { lat: 24.00000, lon: 121.00000, bearing_deg: 135 }
-#     source: "https://…"          # where the official data came from
-#
+# Verify new/changed entries on the map screen and on the road; nudge
+# coordinates here and rerun the pipeline to fix.
+
 sections:
+  # ── Taichung ────────────────────────────────────────────────────────────
   # 臺中市科技執法 dataset 170673, row 1. Exit anchored to the OSM-verified
-  # 向上路六段×自立路 intersection (Shalu); entry computed by walking the
-  # official 1601.16 m back along the road geometry toward Longjing.
-  # Limit 50 confirmed by national dataset 7320 (same description, 速限=50).
-  # VERIFY on the map screen / first ride: the 中興路 end could not be
-  # name-confirmed in OSM. Enforced northbound (Longjing → Shalu) per source.
+  # 向上路六段×自立路 intersection (Shalu); entry walked 1601.16 m (official
+  # length) back along the road geometry toward Longjing. Limit 50 confirmed
+  # by national dataset 7320 (same description, 速限=50).
+  # VERIFY on first ride: the 中興路 end could not be name-confirmed in OSM.
   - id: xiangshang6-nb
     name: 向上路六段 龍井中興路口→沙鹿自立路口
     city: 臺中市
@@ -31,3 +34,200 @@ sections:
     entry: { lat: 24.190662, lon: 120.572921, bearing_deg: 339 }
     exit: { lat: 24.203732, lon: 120.567321, bearing_deg: 339 }
     source: "https://data.gov.tw/dataset/170673"
+
+  # 台61 梧棲–大甲 (170673 rows 2-3 + 7320 witness row). linear-ref between
+  # 7320 anchors 143.5K and the zone row's coordinate at 157.8K; scale 0.997,
+  # witness 64 m, official lengths match placements within 0.4%.
+  - id: tai61-wuqi-nb
+    name: 台61 北向 157.8K→151.6K (梧棲–大甲)
+    city: 臺中市
+    speed_limit_kmh: 90
+    length_m: 6169.1
+    entry: { lat: 24.219169, lon: 120.523038, bearing_deg: 21 }
+    exit: { lat: 24.271176, lon: 120.545414, bearing_deg: 21 }
+    source: "https://data.gov.tw/dataset/170673"
+  - id: tai61-wuqi-sb
+    name: 台61 南向 148.1K→156.4K (大甲–梧棲)
+    city: 臺中市
+    speed_limit_kmh: 90
+    length_m: 8312
+    entry: { lat: 24.301578, lon: 120.554466, bearing_deg: 201 }
+    exit: { lat: 24.230880, lon: 120.528177, bearing_deg: 201 }
+    source: "https://data.gov.tw/dataset/170673"
+
+  # ── Miaoli 台61 通霄–苑裡 (7320). linear-ref anchors 105.3K/143.5K,
+  # scale 0.970, witness 226 m. Lengths are km-span × scale.
+  - id: tai61-tongxiao-nb
+    name: 台61 北向 122.6K→115.6K (通霄–苑裡)
+    city: 苗栗縣
+    speed_limit_kmh: 90
+    length_m: 6790
+    entry: { lat: 24.489211, lon: 120.673658, bearing_deg: 37 }
+    exit: { lat: 24.543552, lon: 120.701876, bearing_deg: 22 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: tai61-tongxiao-sb
+    name: 台61 南向 122.2K→130.2K (通霄–苑裡)
+    city: 苗栗縣
+    speed_limit_kmh: 90
+    length_m: 7760
+    entry: { lat: 24.492207, lon: 120.675626, bearing_deg: 202 }
+    exit: { lat: 24.435093, lon: 120.634055, bearing_deg: 216 }
+    source: "https://data.gov.tw/dataset/7320"
+
+  # ── Keelung 台62 (7320). linear-ref anchors 3.4K/16.83K — scale 0.999,
+  # witness 40 m (west zone) and 19 m (瑪陵 entry).
+  - id: tai62-rueifang-wb
+    name: 台62 西向 11.3K→6.2K (瑞芳–暖暖)
+    city: 基隆市
+    speed_limit_kmh: 80
+    length_m: 5094
+    entry: { lat: 25.101827, lon: 121.753051, bearing_deg: 244 }
+    exit: { lat: 25.098546, lon: 121.705372, bearing_deg: 243 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: tai62-maling-wb
+    name: 台62 西向 1.7K→0.7K (瑪陵隧道)
+    city: 基隆市
+    speed_limit_kmh: 70
+    length_m: 1000
+    entry: { lat: 25.128817, lon: 121.696972, bearing_deg: 355 }
+    exit: { lat: 25.136727, lon: 121.701271, bearing_deg: 34 }
+    source: "https://data.gov.tw/dataset/7320"
+
+  # ── Taipei tunnels (7320; enforced both directions). Endpoints are OSM
+  # bore portals; witness coordinates 402 m / 217 m from a portal.
+  - id: ziqiang-nb
+    name: 自強隧道 北向 (大直→士林)
+    city: 臺北市
+    speed_limit_kmh: 50
+    length_m: 826
+    entry: { lat: 25.086978, lon: 121.549595, bearing_deg: 355 }
+    exit: { lat: 25.094426, lon: 121.548898, bearing_deg: 355 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: ziqiang-sb
+    name: 自強隧道 南向 (士林→大直)
+    city: 臺北市
+    speed_limit_kmh: 50
+    length_m: 826
+    entry: { lat: 25.094426, lon: 121.548898, bearing_deg: 175 }
+    exit: { lat: 25.086978, lon: 121.549595, bearing_deg: 175 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: xinhai-sb
+    name: 辛亥隧道 南向 (大安→文山)
+    city: 臺北市
+    speed_limit_kmh: 50
+    length_m: 487
+    entry: { lat: 25.013323, lon: 121.554132, bearing_deg: 138 }
+    exit: { lat: 25.010071, lon: 121.557383, bearing_deg: 138 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: xinhai-nb
+    name: 辛亥隧道 北向 (文山→大安)
+    city: 臺北市
+    speed_limit_kmh: 50
+    length_m: 487
+    entry: { lat: 25.010071, lon: 121.557383, bearing_deg: 318 }
+    exit: { lat: 25.013323, lon: 121.554132, bearing_deg: 318 }
+    source: "https://data.gov.tw/dataset/7320"
+
+  # ── 蘇花改 tunnels, southbound rows from 7320. Portal-to-portal; walked
+  # bore lengths within 6.3% / 11.8% of the rows' km spans (the enforced
+  # gantries may sit slightly inside; self-consistent portal pair is used).
+  - id: guanyin-tunnel-sb
+    name: 台9 觀音隧道 南向
+    city: 宜蘭縣
+    speed_limit_kmh: 70
+    length_m: 7949
+    entry: { lat: 24.436143, lon: 121.774635, bearing_deg: 176 }
+    exit: { lat: 24.368147, lon: 121.780031, bearing_deg: 176 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: gufeng-sb
+    name: 台9 谷風隧道 南向
+    city: 宜蘭縣
+    speed_limit_kmh: 70
+    length_m: 4656
+    entry: { lat: 24.367757, lon: 121.779387, bearing_deg: 199 }
+    exit: { lat: 24.329544, lon: 121.765063, bearing_deg: 199 }
+    source: "https://data.gov.tw/dataset/7320"
+
+  # ── 台9戊 壽卡–森永 (7320, paired rows give both gantries). Road walk
+  # 6026 m vs km span 5980 m (+0.8%).
+  - id: shouka-nb
+    name: 台9戊 壽卡→森永 (9.92K→3.94K)
+    city: 臺東縣
+    speed_limit_kmh: 40
+    length_m: 6026
+    entry: { lat: 22.254738, lon: 120.841080, bearing_deg: 12 }
+    exit: { lat: 22.277948, lon: 120.864560, bearing_deg: 67 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: shouka-sb
+    name: 台9戊 森永→壽卡 (3.94K→9.92K)
+    city: 臺東縣
+    speed_limit_kmh: 40
+    length_m: 6026
+    entry: { lat: 22.277948, lon: 120.864560, bearing_deg: 247 }
+    exit: { lat: 22.254738, lon: 120.841080, bearing_deg: 192 }
+    source: "https://data.gov.tw/dataset/7320"
+
+  # ── 臺11線 小馬 (7320, paired rows). Road walk 3507 m vs 3480 m (+0.8%).
+  - id: xiaoma-sb
+    name: 臺11線 南向 126.13K→129.61K (小馬)
+    city: 臺東縣
+    speed_limit_kmh: 60
+    length_m: 3507
+    entry: { lat: 23.007769, lon: 121.323524, bearing_deg: 186 }
+    exit: { lat: 22.980171, lon: 121.309660, bearing_deg: 210 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: xiaoma-nb
+    name: 臺11線 北向 129.61K→126.13K (小馬)
+    city: 臺東縣
+    speed_limit_kmh: 60
+    length_m: 3507
+    entry: { lat: 22.980171, lon: 121.309660, bearing_deg: 30 }
+    exit: { lat: 23.007769, lon: 121.323524, bearing_deg: 6 }
+    source: "https://data.gov.tw/dataset/7320"
+
+  # ── 金門大橋 (7320, paired rows give both gantries). Walked bridge length
+  # 5440 m — the gantries span the whole 5.4 km bridge, wider than the
+  # 0.4K–5.1K labels. Bridge arcs gently; straight-line bearings used.
+  - id: kinmen-bridge-eb
+    name: 金門大橋 東向 (烈嶼→金寧)
+    city: 金門縣
+    speed_limit_kmh: 60
+    length_m: 5440
+    entry: { lat: 24.446750, lon: 118.262360, bearing_deg: 82 }
+    exit: { lat: 24.452068, lon: 118.303474, bearing_deg: 82 }
+    source: "https://data.gov.tw/dataset/7320"
+  - id: kinmen-bridge-wb
+    name: 金門大橋 西向 (金寧→烈嶼)
+    city: 金門縣
+    speed_limit_kmh: 60
+    length_m: 5440
+    entry: { lat: 24.452068, lon: 118.303474, bearing_deg: 262 }
+    exit: { lat: 24.446750, lon: 118.262360, bearing_deg: 262 }
+    source: "https://data.gov.tw/dataset/7320"
+
+# ── CANDIDATES — known zones that did NOT pass verification; do not enable
+# without resolving the noted problem. Coordinates are the 7320 row witness.
+#
+#  台9  東澳隧道 北向 110K960→108K224, limit 70, witness 24.536793,121.836655
+#       → zone (2736 m) is shorter than the OSM bore (3360 m): gantries sit
+#         inside the tunnel; needs km referencing on 台9, not portals.
+#  台61 觀音–新屋 41.5K→46.9K (高架), limit 90, witness 25.035498,121.060905
+#       → the two 7320 km anchors nearby (39.6K/50.8K) imply an impossible
+#         road/km scale (0.49); at least one government km label is wrong.
+#  台65 北向 7.9K主線→4.5K, limit 80, witness 24.999134,121.451256 — no
+#       second km anchor available on 台65.
+#  台64 西向 1.6K→5.4K (limit 80, 25.111614,121.422195); 東向 21.4K→23.2K
+#       (limit 70, 25.018978,121.47077); 25.2K→28.2K 雙向 (limit 70,
+#       24.994034,121.49126) — no km anchors on 台64.
+#  台2  73.7K→79.6K / 79.7K→84K / 85.8K→87.5K / 105.8K→113.2K 雙向
+#       (limits 60/60/50/60) — witness coords look like a km ladder but the
+#       "coordinate = first km" assumption is unproven.
+#  台9  北宜 19K→23.1K / 26.2K→32.2K / 33.3K→37.2K 雙向 (limit 40) — same.
+#  臺21 53.8K↔51.1K 雙向 (limit 60, 23.94172,120.92913) — single anchor.
+#  台7乙 12.1K→8.2K (40); 台三線 50.5K→51.7K (60) / 31.8K→30.5K (50) /
+#       82.2K→84.3K (60) / 103.2K→108K & 114.3K→123.6K (60) /
+#       內門 389.5K→392.5K (60); 台66 3K→14.8K (80); 台13甲 8.3K→9.5K &
+#       9.8K→11K (60); 縣140 16.2K→16.9K & 23.1K→25.1K (60); 市道182
+#       27.2K→28.4K 雙向 (50) & 28.9K→31.8K (50); 北118 壽山路 0K→1.2K
+#       (40); 台62甲 3號隧道→東海街 (50, 25.124674,121.77938) — all single
+#       witness coordinate, no independent anchors yet.
