@@ -48,10 +48,13 @@ class SettingsRepository(
                 speedToleranceKmh = prefs[KEY_SPEED_TOLERANCE] ?: DEFAULTS.speedToleranceKmh,
                 chimeEnabled = prefs[KEY_CHIME] ?: DEFAULTS.chimeEnabled,
                 enabledTypes =
-                    prefs[KEY_ENABLED_TYPES]
-                        ?.mapNotNull { name -> CameraType.entries.find { it.name == name } }
-                        ?.toSet()
-                        ?: DEFAULTS.enabledTypes,
+                    prefs[KEY_ENABLED_TYPES]?.let { names ->
+                        val parsed = names.mapNotNull { name -> CameraType.entries.find { it.name == name } }.toSet()
+                        // A non-empty persisted set that maps to nothing is
+                        // corrupt data, not a choice: fall back to defaults
+                        // rather than silently disabling every alert.
+                        if (parsed.isEmpty() && names.isNotEmpty()) DEFAULTS.enabledTypes else parsed
+                    } ?: DEFAULTS.enabledTypes,
                 languageTag = prefs[KEY_LANGUAGE] ?: DEFAULTS.languageTag,
                 autoUpdateEnabled = prefs[KEY_AUTO_UPDATE] ?: DEFAULTS.autoUpdateEnabled,
                 wifiOnlyUpdates = prefs[KEY_WIFI_ONLY] ?: DEFAULTS.wifiOnlyUpdates,

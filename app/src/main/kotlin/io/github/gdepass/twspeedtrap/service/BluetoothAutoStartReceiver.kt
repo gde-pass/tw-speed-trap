@@ -1,5 +1,6 @@
 package io.github.gdepass.twspeedtrap.service
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -7,14 +8,17 @@ import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Starts detection when a Bluetooth device connects (opt-in setting).
@@ -30,11 +34,24 @@ class BluetoothAutoStartReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (intent.action != BluetoothDevice.ACTION_ACL_CONNECTED) return
+        // Without location permission the service would only start and die.
+        val granted =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            Log.w(TAG, "location permission missing — ignoring Bluetooth connect")
+            return
+        }
         val pending = goAsync()
+        // The timeout keeps the coroutine bounded well inside the ~10 s
+        // broadcast window, so nothing outlives the receiver.
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val settings = SettingsRepository(context.applicationContext).settings.first()
-                if (settings.autoStartBluetoothEnabled) startOrPrompt(context.applicationContext)
+                val settings =
+                    withTimeoutOrNull(SETTINGS_TIMEOUT_MS) {
+                        SettingsRepository(context.applicationContext).settings.first()
+                    }
+                if (settings?.autoStartBluetoothEnabled == true) startOrPrompt(context.applicationContext)
             } finally {
                 pending.finish()
             }
@@ -91,5 +108,6 @@ class BluetoothAutoStartReceiver : BroadcastReceiver() {
         private const val CHANNEL_ID = "autostart"
         private const val NOTIFICATION_ID = 2
         private const val REQUEST_CODE = 2
+        private const val SETTINGS_TIMEOUT_MS = 8_000L
     }
 }
