@@ -1,4 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">TW SpeedTrap</string>
+
+    <!-- Main screen -->
+    <string name="btn_start">Start detection</string>
+    <string name="btn_stop">Stop detection</string>
+    <string name="speed_unit">km/h</string>
+    <string name="no_camera_nearby">No camera nearby</string>
+    <string name="next_camera">Camera in %1$d m</string>
+    <string name="next_camera_limit">Camera in %1$d m · limit %2$d</string>
+    <string name="gps_waiting">Waiting for GPS…</string>
+    <string name="gps_accuracy">GPS ±%1$d m</string>
+    <string name="cameras_loaded">%1$d cameras</string>
+
+    <!-- Permission onboarding -->
+    <string name="perm_location_title">Location access</string>
+    <string name="perm_location_body">Needed to know your position and speed. Your location never leaves this phone.</string>
+    <string name="perm_location_grant">Grant location</string>
+    <string name="perm_background_title">Background location</string>
+    <string name="perm_background_body">Keeps alerts working with the screen off or while Google Maps is in front. Choose “Allow all the time”.</string>
+    <string name="perm_background_grant">Allow all the time</string>
+    <string name="perm_notifications_title">Notifications</string>
+    <string name="perm_notifications_body">Shows the persistent status notification while detection is running.</string>
+    <string name="perm_notifications_grant">Allow notifications</string>
+    <string name="perm_battery_title">Battery optimisation</string>
+    <string name="perm_battery_body">Android silently kills GPS apps when the screen is off unless they are exempted. This is the number-one cause of missed alerts.</string>
+    <string name="perm_battery_grant">Disable optimisation</string>
+
+    <!-- Foreground service notification -->
+    <string name="notif_channel_name">Detection status</string>
+    <string name="notif_title">TW SpeedTrap</string>
+    <string name="notif_starting">Starting detection…</string>
+    <string name="notif_speed">%1$d km/h</string>
+    <string name="notif_speed_camera">%1$d km/h · camera in %2$d m</string>
+    <string name="notif_stop">Stop</string>
+
+    <!-- Spoken alerts: short and unambiguous at speed -->
+    <string name="alert_fixed_camera">Fixed camera, %1$d metres</string>
+    <string name="alert_fixed_camera_limit">Fixed camera, %1$d metres, limit %2$d</string>
 </resources>

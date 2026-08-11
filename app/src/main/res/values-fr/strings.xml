@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main screen -->
+    <string name="btn_start">Démarrer la détection</string>
+    <string name="btn_stop">Arrêter la détection</string>
+    <string name="speed_unit">km/h</string>
+    <string name="no_camera_nearby">Aucun radar à proximité</string>
+    <string name="next_camera">Radar à %1$d m</string>
+    <string name="next_camera_limit">Radar à %1$d m · limite %2$d</string>
+    <string name="gps_waiting">En attente du GPS…</string>
+    <string name="gps_accuracy">GPS ±%1$d m</string>
+    <string name="cameras_loaded">%1$d radars</string>
+
+    <!-- Permission onboarding -->
+    <string name="perm_location_title">Accès à la position</string>
+    <string name="perm_location_body">Nécessaire pour connaître votre position et votre vitesse. Votre position ne quitte jamais ce téléphone.</string>
+    <string name="perm_location_grant">Autoriser la position</string>
+    <string name="perm_background_title">Position en arrière-plan</string>
+    <string name="perm_background_body">Maintient les alertes écran éteint ou pendant que Google Maps est au premier plan. Choisissez « Toujours autoriser ».</string>
+    <string name="perm_background_grant">Toujours autoriser</string>
+    <string name="perm_notifications_title">Notifications</string>
+    <string name="perm_notifications_body">Affiche la notification d’état permanente pendant la détection.</string>
+    <string name="perm_notifications_grant">Autoriser les notifications</string>
+    <string name="perm_battery_title">Optimisation de la batterie</string>
+    <string name="perm_battery_body">Android coupe silencieusement le GPS des applis écran éteint, sauf exemption. C’est la cause n°1 des alertes manquées.</string>
+    <string name="perm_battery_grant">Désactiver l’optimisation</string>
+
+    <!-- Foreground service notification -->
+    <string name="notif_channel_name">État de la détection</string>
+    <string name="notif_title">TW SpeedTrap</string>
+    <string name="notif_starting">Démarrage de la détection…</string>
+    <string name="notif_speed">%1$d km/h</string>
+    <string name="notif_speed_camera">%1$d km/h · radar à %2$d m</string>
+    <string name="notif_stop">Arrêter</string>
+
+    <!-- Spoken alerts: short and unambiguous at speed -->
+    <string name="alert_fixed_camera">Radar fixe, %1$d mètres</string>
+    <string name="alert_fixed_camera_limit">Radar fixe, %1$d mètres, limite %2$d</string>
+</resources>
