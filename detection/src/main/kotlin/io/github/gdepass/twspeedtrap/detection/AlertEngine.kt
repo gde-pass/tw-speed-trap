@@ -3,6 +3,7 @@ package io.github.gdepass.twspeedtrap.detection
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 data class EngineConfig(
     /** Alert distance = max(minAlertDistanceM, speed_m/s × distanceMultiplier). */
@@ -60,7 +61,11 @@ class AlertEngine(
             if (distance > alertDistance * config.rearmFactor) disarmed.remove(camera.id)
         } else if (distance <= alertDistance) {
             disarmed.add(camera.id)
-            events.add(AlertEvent.CameraAhead(camera, distance))
+            val speedKmh = (fix.speedMps * 3.6).roundToInt()
+            val overLimit =
+                camera.speedLimitKmh != null &&
+                    speedKmh > camera.speedLimitKmh + config.speedToleranceKmh
+            events.add(AlertEvent.CameraAhead(camera, distance, speedKmh, overLimit))
         }
         return distance
     }

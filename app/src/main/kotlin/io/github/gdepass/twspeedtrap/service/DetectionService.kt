@@ -14,10 +14,12 @@ import androidx.lifecycle.lifecycleScope
 import io.github.gdepass.twspeedtrap.MainActivity
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.data.CameraRepository
+import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.detection.AlertEngine
 import io.github.gdepass.twspeedtrap.detection.AlertEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -25,6 +27,7 @@ import kotlin.math.roundToInt
 class DetectionService : LifecycleService() {
     private var detectionJob: Job? = null
     private var announcer: Announcer? = null
+    private var chimeEnabled = true
 
     override fun onCreate() {
         super.onCreate()
@@ -61,8 +64,10 @@ class DetectionService : LifecycleService() {
 
         detectionJob =
             lifecycleScope.launch {
+                val settings = SettingsRepository(applicationContext).settings.first()
+                chimeEnabled = settings.chimeEnabled
                 val cameras = withContext(Dispatchers.IO) { CameraRepository(this@DetectionService).loadCameras() }
-                val engine = AlertEngine(cameras)
+                val engine = AlertEngine(cameras, settings.toEngineConfig())
                 DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
 
                 LocationSource(this@DetectionService).fixes().collect { fix ->
@@ -87,14 +92,17 @@ class DetectionService : LifecycleService() {
             is AlertEvent.CameraAhead -> {
                 val distance = roundForSpeech(event.distanceM)
                 val limit = event.camera.speedLimitKmh
-                val text =
+                var text =
                     if (limit != null) {
                         getString(R.string.alert_fixed_camera_limit, distance, limit)
                     } else {
                         getString(R.string.alert_fixed_camera, distance)
                     }
+                if (event.overLimit) {
+                    text = getString(R.string.alert_with_warning, text)
+                }
                 Log.i(TAG, "alert: $text (${event.camera.id} at ${event.distanceM.roundToInt()} m)")
-                announcer?.speak(text)
+                announcer?.speak(text, chimeEnabled)
             }
         }
     }

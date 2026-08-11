@@ -50,5 +50,8 @@ sealed interface AlertEvent {
     data class CameraAhead(
         val camera: Camera,
         val distanceM: Double,
+        val speedKmh: Int,
+        /** True when current speed exceeds the camera's limit plus the tolerance. */
+        val overLimit: Boolean,
     ) : AlertEvent
 }

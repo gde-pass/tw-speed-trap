@@ -38,4 +38,5 @@
     <!-- Spoken alerts: short and unambiguous at speed -->
     <string name="alert_fixed_camera">Fixed camera, %1$d metres</string>
     <string name="alert_fixed_camera_limit">Fixed camera, %1$d metres, limit %2$d</string>
+    <string name="alert_with_warning">%1$s. Slow down!</string>
 </resources>
