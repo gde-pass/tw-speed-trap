@@ -16,4 +16,18 @@
 #     exit:  { lat: 24.00000, lon: 121.00000, bearing_deg: 135 }
 #     source: "https://…"          # where the official data came from
 #
-sections: []
+sections:
+  # 臺中市科技執法 dataset 170673, row 1. Exit anchored to the OSM-verified
+  # 向上路六段×自立路 intersection (Shalu); entry computed by walking the
+  # official 1601.16 m back along the road geometry toward Longjing.
+  # Limit 50 confirmed by national dataset 7320 (same description, 速限=50).
+  # VERIFY on the map screen / first ride: the 中興路 end could not be
+  # name-confirmed in OSM. Enforced northbound (Longjing → Shalu) per source.
+  - id: xiangshang6-nb
+    name: 向上路六段 龍井中興路口→沙鹿自立路口
+    city: 臺中市
+    speed_limit_kmh: 50
+    length_m: 1601.16
+    entry: { lat: 24.190662, lon: 120.572921, bearing_deg: 339 }
+    exit: { lat: 24.203732, lon: 120.567321, bearing_deg: 339 }
+    source: "https://data.gov.tw/dataset/170673"

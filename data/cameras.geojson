@@ -41865,6 +41865,50 @@
     "type": "fixed"
    },
    "type": "Feature"
+  },
+  {
+   "geometry": {
+    "coordinates": [
+     120.572921,
+     24.190662
+    ],
+    "type": "Point"
+   },
+   "properties": {
+    "bearing": 339.0,
+    "city": "臺中市",
+    "description": "向上路六段 龍井中興路口→沙鹿自立路口",
+    "id": "sec-xiangshang6-nb-entry",
+    "last_seen": "2026-08-11",
+    "section_id": "xiangshang6-nb",
+    "section_role": "start",
+    "source": "curated:sections.yaml",
+    "speed_limit": 50,
+    "type": "section"
+   },
+   "type": "Feature"
+  },
+  {
+   "geometry": {
+    "coordinates": [
+     120.567321,
+     24.203732
+    ],
+    "type": "Point"
+   },
+   "properties": {
+    "bearing": 339.0,
+    "city": "臺中市",
+    "description": "向上路六段 龍井中興路口→沙鹿自立路口",
+    "id": "sec-xiangshang6-nb-exit",
+    "last_seen": "2026-08-11",
+    "section_id": "xiangshang6-nb",
+    "section_role": "end",
+    "source": "curated:sections.yaml",
+    "speed_limit": 50,
+    "type": "section"
+   },
+   "type": "Feature"
   }
  ],
  "type": "FeatureCollection"
