@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import io.github.gdepass.twspeedtrap.detection.Camera
 import io.github.gdepass.twspeedtrap.detection.CameraType
+import io.github.gdepass.twspeedtrap.detection.Section
 import java.io.File
 
 /**
@@ -57,6 +58,18 @@ class CameraRepository(
                         }
                     }
                 }
+        }
+
+    fun loadSections(): Map<String, Section> =
+        openReadOnly().use { db ->
+            db.rawQuery("SELECT id, speed_limit, length_m FROM sections", null).use { cursor ->
+                buildMap {
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(0)
+                        put(id, Section(id, cursor.getInt(1), cursor.getDouble(2)))
+                    }
+                }
+            }
         }
 
     fun metadata(): Map<String, String> =

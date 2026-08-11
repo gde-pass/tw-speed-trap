@@ -76,8 +76,10 @@ class DetectionService : LifecycleService() {
                         this@DetectionService,
                         LocaleOverride.resolve(this@DetectionService, settings.languageTag),
                     ) { missing -> DetectionStatus.update { it.copy(voiceMissing = missing) } }
-                val cameras = withContext(Dispatchers.IO) { CameraRepository(this@DetectionService).loadCameras() }
-                val engine = AlertEngine(cameras, settings.toEngineConfig())
+                val repository = CameraRepository(this@DetectionService)
+                val (cameras, sections) =
+                    withContext(Dispatchers.IO) { repository.loadCameras() to repository.loadSections() }
+                val engine = AlertEngine(cameras, settings.toEngineConfig(), sections)
                 DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
 
                 LocationSource(this@DetectionService).fixes().collect { fix ->
@@ -113,6 +115,22 @@ class DetectionService : LifecycleService() {
                 }
                 Log.i(TAG, "alert: $text (${event.camera.id} at ${event.distanceM.roundToInt()} m)")
                 announcer?.speak(text, chimeEnabled)
+            }
+            is AlertEvent.SectionEntered -> {
+                val text = localized.getString(R.string.alert_section_entered, event.section.speedLimitKmh)
+                Log.i(TAG, "alert: $text (${event.section.id})")
+                announcer?.speak(text, chimeEnabled)
+            }
+            is AlertEvent.SectionOverPace -> {
+                val text = localized.getString(R.string.alert_section_over)
+                Log.i(TAG, "alert: $text (projected ${event.projectedAvgKmh} km/h)")
+                announcer?.speak(text, chime = false)
+            }
+            is AlertEvent.SectionExited -> {
+                var text = localized.getString(R.string.alert_section_exited, event.averageKmh)
+                if (event.overLimit) text = localized.getString(R.string.alert_with_warning, text)
+                Log.i(TAG, "alert: $text (${event.section.id})")
+                announcer?.speak(text, chime = false)
             }
         }
     }

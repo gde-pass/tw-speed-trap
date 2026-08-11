@@ -46,12 +46,34 @@ data class Fix(
     val timestampMs: Long,
 )
 
+data class Section(
+    val id: String,
+    val speedLimitKmh: Int,
+    val lengthM: Double,
+)
+
 sealed interface AlertEvent {
     data class CameraAhead(
         val camera: Camera,
         val distanceM: Double,
         val speedKmh: Int,
         /** True when current speed exceeds the camera's limit plus the tolerance. */
+        val overLimit: Boolean,
+    ) : AlertEvent
+
+    data class SectionEntered(
+        val section: Section,
+    ) : AlertEvent
+
+    /** Projected section average exceeds limit + tolerance; fired once per traversal. */
+    data class SectionOverPace(
+        val section: Section,
+        val projectedAvgKmh: Int,
+    ) : AlertEvent
+
+    data class SectionExited(
+        val section: Section,
+        val averageKmh: Int,
         val overLimit: Boolean,
     ) : AlertEvent
 }

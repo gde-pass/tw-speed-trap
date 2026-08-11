@@ -26,9 +26,12 @@ data class EngineConfig(
 class AlertEngine(
     cameras: List<Camera>,
     private val config: EngineConfig = EngineConfig(),
+    sections: Map<String, Section> = emptyMap(),
 ) {
     private val index = GridIndex(cameras)
     private val disarmed = HashSet<String>()
+    private val sectionTracker = AverageSpeedTracker(cameras, sections, config)
+    private val sectionsEnabled = CameraType.SECTION in config.enabledTypes
 
     /** Distance to the nearest relevant camera, for the UI. */
     var nearestCamera: Pair<Camera, Double>? = null
@@ -44,6 +47,7 @@ class AlertEngine(
             if (nearest == null || distance < nearest.second) nearest = camera to distance
         }
         nearestCamera = nearest
+        if (sectionsEnabled) events.addAll(sectionTracker.onFix(fix))
         return events
     }
 
@@ -54,6 +58,8 @@ class AlertEngine(
         alertDistance: Double,
         events: MutableList<AlertEvent>,
     ): Double? {
+        // Section endpoints are announced by the AverageSpeedTracker, not as point cameras.
+        if (camera.type == CameraType.SECTION) return null
         if (camera.type !in config.enabledTypes) return null
         if (!bearingMatches(fix, camera)) return null
         val distance = GeoMath.distanceMeters(fix.lat, fix.lon, camera.lat, camera.lon)

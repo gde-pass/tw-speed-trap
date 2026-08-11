@@ -37,6 +37,9 @@
     <string name="alert_fixed_camera">Radar fixe, %1$d mètres</string>
     <string name="alert_fixed_camera_limit">Radar fixe, %1$d mètres, limite %2$d</string>
     <string name="alert_with_warning">%1$s. Ralentissez !</string>
+    <string name="alert_section_entered">Zone à vitesse moyenne, limite %1$d</string>
+    <string name="alert_section_over">Moyenne trop élevée, ralentissez !</string>
+    <string name="alert_section_exited">Fin de zone, moyenne %1$d</string>
 
     <!-- Settings -->
     <string name="settings_title">Réglages</string>
