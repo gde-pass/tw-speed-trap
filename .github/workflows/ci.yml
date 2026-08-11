@@ -21,3 +21,14 @@ jobs:
 
       - name: Build and check
         run: ./gradlew assembleDebug :detection:test :app:testDebugUnitTest ktlintCheck detekt --stacktrace
+
+  pipeline:
+    name: Pipeline tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Run pipeline tests
+        run: uv run --directory pipeline pytest
