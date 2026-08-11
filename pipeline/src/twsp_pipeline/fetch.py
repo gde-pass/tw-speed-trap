@@ -8,6 +8,7 @@ currently lives.
 import io
 import ssl
 import time
+import urllib.parse
 import zipfile
 
 import requests
@@ -48,7 +49,17 @@ BROWSER_UA = (
 )
 
 
+# Hosts that hit a connect timeout this run. Some municipal file hosts
+# (data.kcg.gov.tw) silently drop GitHub-runner traffic; without this, six
+# datasets on one dead host would each burn RETRIES × 2 × TIMEOUT_S before
+# their snapshot fallback kicks in.
+_timed_out_hosts: set[str] = set()
+
+
 def _get(url: str) -> requests.Response:
+    host = urllib.parse.urlsplit(url).hostname or ""
+    if host in _timed_out_hosts:
+        raise FetchError(f"skipping {url}: {host} already timed out this run")
     last_error: Exception | None = None
     for attempt in range(RETRIES):
         for headers in (
@@ -59,6 +70,9 @@ def _get(url: str) -> requests.Response:
                 resp = _session.get(url, headers=headers, timeout=TIMEOUT_S)
                 resp.raise_for_status()
                 return resp
+            except requests.exceptions.ConnectTimeout as e:
+                _timed_out_hosts.add(host)
+                raise FetchError(f"failed to fetch {url}: {e}") from e
             except Exception as e:  # noqa: BLE001 - retry on any transport error
                 last_error = e
         time.sleep(2**attempt)
