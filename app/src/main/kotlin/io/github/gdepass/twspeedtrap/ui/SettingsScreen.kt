@@ -28,8 +28,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -38,11 +42,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.data.AppSettings
+import io.github.gdepass.twspeedtrap.data.CameraRepository
+import io.github.gdepass.twspeedtrap.data.DbUpdater
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
+import io.github.gdepass.twspeedtrap.data.UpdateResult
+import io.github.gdepass.twspeedtrap.data.UpdateWorker
 import io.github.gdepass.twspeedtrap.detection.CameraType
 import io.github.gdepass.twspeedtrap.service.DetectionStatus
 import io.github.gdepass.twspeedtrap.util.LocaleOverride
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
@@ -112,6 +122,66 @@ fun SettingsScreen(onBack: () -> Unit) {
                     val updated = if (enabled) settings.enabledTypes + type else settings.enabledTypes - type
                     scope.launch { repository.setEnabledTypes(updated) }
                 }
+            }
+
+            SectionTitle(stringResource(R.string.settings_data))
+            var metaRefresh by remember { mutableIntStateOf(0) }
+            val metadata by produceState(initialValue = emptyMap(), metaRefresh) {
+                value =
+                    withContext(Dispatchers.IO) {
+                        runCatching { CameraRepository(context.applicationContext).metadata() }
+                            .getOrDefault(emptyMap())
+                    }
+            }
+            Text(
+                text =
+                    stringResource(
+                        R.string.data_version_info,
+                        metadata["data_version"] ?: "—",
+                        metadata["count"] ?: "—",
+                    ),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            SwitchRow(stringResource(R.string.settings_auto_update), settings.autoUpdateEnabled) {
+                scope.launch {
+                    repository.setAutoUpdateEnabled(it)
+                    UpdateWorker.schedule(context.applicationContext, it, settings.wifiOnlyUpdates)
+                }
+            }
+            SwitchRow(stringResource(R.string.settings_wifi_only), settings.wifiOnlyUpdates) {
+                scope.launch {
+                    repository.setWifiOnlyUpdates(it)
+                    UpdateWorker.schedule(context.applicationContext, settings.autoUpdateEnabled, it)
+                }
+            }
+            var checking by remember { mutableStateOf(false) }
+            var updateStatus by remember { mutableStateOf<String?>(null) }
+            val strings = LocalContext.current.resources
+            Button(
+                enabled = !checking,
+                onClick = {
+                    scope.launch {
+                        checking = true
+                        updateStatus = null
+                        val result = DbUpdater(context.applicationContext).checkAndUpdate()
+                        updateStatus =
+                            when (result) {
+                                UpdateResult.UpToDate -> strings.getString(R.string.update_result_uptodate)
+                                is UpdateResult.Updated ->
+                                    strings.getString(R.string.update_result_updated, result.dataVersion, result.count)
+                                is UpdateResult.Failed ->
+                                    strings.getString(R.string.update_result_failed, result.reason)
+                            }
+                        metaRefresh++
+                        checking = false
+                    }
+                },
+            ) {
+                Text(stringResource(if (checking) R.string.update_checking else R.string.update_check_now))
+            }
+            updateStatus?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium)
             }
 
             SectionTitle(stringResource(R.string.settings_voice))

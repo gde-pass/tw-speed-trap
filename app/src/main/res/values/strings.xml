@@ -58,6 +58,15 @@
     <string name="type_section">Average-speed sections</string>
     <string name="type_tech">Tech enforcement</string>
     <string name="type_other">Other</string>
+    <string name="settings_data">Camera database</string>
+    <string name="data_version_info">Version %1$s · %2$s cameras</string>
+    <string name="settings_auto_update">Automatic weekly update</string>
+    <string name="settings_wifi_only">Wi-Fi only</string>
+    <string name="update_check_now">Check for update now</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_result_uptodate">Already up to date</string>
+    <string name="update_result_updated">Updated to %1$s (%2$d cameras)</string>
+    <string name="update_result_failed">Update failed: %1$s</string>
     <string name="settings_voice">Voice</string>
     <string name="voice_missing_warning">No voice is installed for the selected language. Alerts may be silent.</string>
     <string name="voice_install">Install voice data</string>

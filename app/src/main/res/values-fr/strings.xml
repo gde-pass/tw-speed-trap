@@ -56,6 +56,15 @@
     <string name="type_section">Radars tronçons</string>
     <string name="type_tech">Contrôle technologique</string>
     <string name="type_other">Autres</string>
+    <string name="settings_data">Base de radars</string>
+    <string name="data_version_info">Version %1$s · %2$s radars</string>
+    <string name="settings_auto_update">Mise à jour hebdomadaire automatique</string>
+    <string name="settings_wifi_only">Wi-Fi uniquement</string>
+    <string name="update_check_now">Vérifier maintenant</string>
+    <string name="update_checking">Vérification…</string>
+    <string name="update_result_uptodate">Déjà à jour</string>
+    <string name="update_result_updated">Mise à jour vers %1$s (%2$d radars)</string>
+    <string name="update_result_failed">Échec de la mise à jour : %1$s</string>
     <string name="settings_voice">Voix</string>
     <string name="voice_missing_warning">Aucune voix n’est installée pour la langue choisie. Les alertes peuvent être muettes.</string>
     <string name="voice_install">Installer les données de voix</string>

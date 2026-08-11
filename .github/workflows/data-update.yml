@@ -1,0 +1,61 @@
+name: Data update
+
+on:
+  schedule:
+    # 05:30 Monday Taiwan time (21:30 UTC Sunday)
+    - cron: "30 21 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Rebuild camera database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Run pipeline
+        run: |
+          uv run --directory pipeline build-db \
+            --out pipeline/out \
+            --geojson data/cameras.geojson \
+            --assets-db app/src/main/assets/cameras.db
+
+      - name: Compare with published data
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          new_hash=$(jq -r .content_hash pipeline/out/manifest.json)
+          old_hash=$(gh release download data --pattern manifest.json --output - 2>/dev/null | jq -r .content_hash || echo "none")
+          echo "new=$new_hash old=$old_hash"
+          if [ "$new_hash" = "$old_hash" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated snapshot
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cameras.geojson app/src/main/assets/cameras.db
+          git commit -m "data: update camera database ($(jq -r .data_version pipeline/out/manifest.json), $(jq -r .count pipeline/out/manifest.json) cameras)"
+          git push
+
+      - name: Publish release assets
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fixed-tag prerelease `data`: ignored by releases/latest and by
+          # Obtainium's default filter, so the app-release channel stays clean.
+          gh release view data >/dev/null 2>&1 || \
+            gh release create data --prerelease --title "Camera data" \
+              --notes "Rolling camera-database release. Assets are replaced in place by the weekly data-update workflow."
+          gh release upload data pipeline/out/cameras.db pipeline/out/manifest.json --clobber

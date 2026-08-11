@@ -22,6 +22,8 @@ data class AppSettings(
     val enabledTypes: Set<CameraType> = CameraType.entries.toSet(),
     /** BCP-47 tag ("fr", "en") or [io.github.gdepass.twspeedtrap.util.LocaleOverride.SYSTEM]. */
     val languageTag: String = "system",
+    val autoUpdateEnabled: Boolean = true,
+    val wifiOnlyUpdates: Boolean = true,
 ) {
     fun toEngineConfig(): EngineConfig =
         EngineConfig(
@@ -46,6 +48,8 @@ class SettingsRepository(
                         ?.toSet()
                         ?: DEFAULTS.enabledTypes,
                 languageTag = prefs[KEY_LANGUAGE] ?: DEFAULTS.languageTag,
+                autoUpdateEnabled = prefs[KEY_AUTO_UPDATE] ?: DEFAULTS.autoUpdateEnabled,
+                wifiOnlyUpdates = prefs[KEY_WIFI_ONLY] ?: DEFAULTS.wifiOnlyUpdates,
             )
         }
 
@@ -60,6 +64,10 @@ class SettingsRepository(
 
     suspend fun setLanguageTag(tag: String) = context.dataStore.edit { it[KEY_LANGUAGE] = tag }
 
+    suspend fun setAutoUpdateEnabled(value: Boolean) = context.dataStore.edit { it[KEY_AUTO_UPDATE] = value }
+
+    suspend fun setWifiOnlyUpdates(value: Boolean) = context.dataStore.edit { it[KEY_WIFI_ONLY] = value }
+
     companion object {
         private val DEFAULTS = AppSettings()
         private val KEY_DISTANCE_MULTIPLIER = doublePreferencesKey("distance_multiplier")
@@ -67,5 +75,7 @@ class SettingsRepository(
         private val KEY_CHIME = booleanPreferencesKey("chime_enabled")
         private val KEY_ENABLED_TYPES = stringSetPreferencesKey("enabled_types")
         private val KEY_LANGUAGE = stringPreferencesKey("language_tag")
+        private val KEY_AUTO_UPDATE = booleanPreferencesKey("auto_update")
+        private val KEY_WIFI_ONLY = booleanPreferencesKey("wifi_only_updates")
     }
 }
