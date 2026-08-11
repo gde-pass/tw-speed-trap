@@ -46,12 +46,12 @@ skipped (re-check when upstream improves):
   per-district micro-datasets (a few rows each, mostly already in 7320) and a
   科技執法 list that exists only as police-website announcements, not open
   data. The catalog sweep later surfaced **123740** (city-wide 新北市固定式
-  測速照相) — evaluate for v1.2.
-- **Kaohsiung** — 160171 is a 2022 snapshot; its successors are delisted
-  yearly. The catalog sweep found the current 115年 series (**176549, 176555,
-  176558, 176560, 176561, 177827**) — evaluate for v1.2, noting the file host
-  (data.kcg.gov.tw) is unreachable from GitHub CI, so imports would ride the
-  snapshot fallback between local refreshes.
+  測速照相): evaluated, only 2 of 190 points are new — skipped.
+- **Kaohsiung** — the catalog sweep found the current 115年 series (176549,
+  176555, 176558, 176560, 176561, 177827); integrated (+358 points, replacing
+  the 2022 snapshot 160171). The file host (data.kcg.gov.tw) is unreachable
+  from GitHub CI, so these ride the snapshot fallback between local refreshes
+  — refresh by running `build-db` locally and committing the assets db.
 
 Upstream monitoring is automated: the monthly `dataset-watch` workflow diffs
 the data.gov.tw catalog against `pipeline/data/dataset_watch.yaml`, checks

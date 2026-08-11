@@ -49,7 +49,12 @@ derivative works with attribution:
 - [臺北市智慧管理科技執法設備資料表 (dataset 135957)](https://data.gov.tw/dataset/135957)
 - [桃園市測速照相設備地點 (dataset 25935)](https://data.gov.tw/dataset/25935)
 - [臺中市科技執法取締地點 (dataset 170673)](https://data.gov.tw/dataset/170673)
-- [高雄市111年交通局建置科技執法設備設置地點 (dataset 160171)](https://data.gov.tw/dataset/160171)
+- [高雄市115年「固定式違規照相科技執法設備」設置地點一覽表 (dataset 176549)](https://data.gov.tw/dataset/176549)
+- [高雄市115年不停讓行人科技執法監測系統設置地點 (dataset 176555)](https://data.gov.tw/dataset/176555)
+- [高雄市115年交通局建置科技執法設備設置地點 (dataset 176558)](https://data.gov.tw/dataset/176558)
+- [高雄市115年捷運局輕軌沿線建置科技執法設備設置地點 (dataset 176560)](https://data.gov.tw/dataset/176560)
+- [高雄市115年路口科技執法監測系統設置地點 (dataset 176561)](https://data.gov.tw/dataset/176561)
+- [高雄市115年租賃式車不停讓行人科技執法地點 (dataset 177827)](https://data.gov.tw/dataset/177827)
 
 資料來源：政府資料開放平臺 (data.gov.tw)。
 
