@@ -2,6 +2,57 @@
 
 Ideas agreed for later versions, in rough priority order.
 
+## Adaptive GPS sampling (deferred pending device evidence)
+
+The 2026-08 audit designed a provably-safe scheme (7×7 grid wake query
+covering ~2.97 km, relax to 5 s intervals only beyond a 2.5 km wake
+boundary with ≤50 m accuracy, never while a section traversal is active,
+priority stays HIGH_ACCURACY — switching to balanced power is ruled out
+permanently because its position error exceeds the wake margin). It is
+**not shipped** because two premises are unprovable device-agnostically:
+whether a 5 s interval actually lets vendor GNSS HALs duty-cycle (if the
+receiver stays hot, the saving is only AP wakeups, which the notification
+throttle already removed), and the RELAXED→FULL re-fix latency bound.
+Evidence needed before shipping: batterystats deltas for 1 s vs 5 s
+HIGH_ACCURACY over ≥1 h screen-off runs on ≥2 chipset families showing
+≥5 %/h saving; p99 re-fix latency <6 s over ≥100 switch trials; and
+confirmation the fused provider doesn't batch 5 s updates under
+Doze-adjacent states while a foreground service holds location.
+
+## Bluetooth auto-start device allowlist
+
+Auto-start currently triggers on *any* Bluetooth ACL connection (speaker,
+car, headset). Field use is fine because the setting is opt-in, but a
+device picker (list bonded devices, store selected MACs, match
+EXTRA_DEVICE in the receiver) would stop a living-room speaker from
+starting GPS. Needs BLUETOOTH_CONNECT UI and a settings schema addition.
+
+## Signed data manifests
+
+The db update channel is TLS-to-GitHub plus a SHA-256 that rides in the
+same manifest — integrity against corruption, not authenticity against a
+compromised release channel. The 2026-08 audit hardened the surrounding
+surface (URL allowlist, size caps, db self-description checks, version
+format guard); actual authenticity needs an Ed25519 signature over the
+manifest, a signing step in data-update.yml (key in Actions secrets), and
+a pinned public key + verification in the app. Straightforward, but key
+management deserves its own change.
+
+## Known upstream data errors (report to source agencies)
+
+- 7320 lists 國道一號南向279公里 at (25.042383, 121.53301) — Taipei city,
+  ~200 km from km 279. The same device in 13940 is correctly at
+  (23.373209, 120.350715). The mislocated row survives dedupe because the
+  positions differ; it produces a spurious freeway-camera alert on 建國高架
+  in Taipei. Recheck after the next 7320 refresh.
+
+## CI: bot data commits skip CI
+
+The weekly data commit is pushed with GITHUB_TOKEN, so GitHub suppresses
+workflow triggering — the committed db/geojson are never CI-validated.
+Fixing it means pushing with a PAT or deploy key (then guarding against
+trigger loops). The build-db --min-count gate now bounds the damage.
+
 ## In-app marking of average-speed section gantries (planned)
 
 **Problem:** section entry/exit points in `pipeline/data/sections.yaml` are
