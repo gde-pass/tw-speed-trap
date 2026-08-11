@@ -68,6 +68,9 @@ def parse_7320(text: str, today: str) -> tuple[list[Camera], list[Unresolved], C
         if (row.get("Longitude") or "").strip() == "經度":
             stats["skipped_zh_header"] += 1
             continue
+        if _is_section((row.get("Address") or "")):
+            stats["skipped_section_row"] += 1
+            continue
         bearing = parse_bearing(row.get("direct"))
         if bearing is None and (row.get("direct") or "").strip():
             stats[f"bearing_both_or_unparsed:{row['direct'].strip()}"] += 1
@@ -112,6 +115,9 @@ def parse_13940(text: str, today: str) -> tuple[list[Camera], list[Unresolved], 
         area = (row.get("設置區域描述") or "").strip()
         if area and area not in description:
             description = f"{area} {description}".strip()
+        if _is_section(description) or _is_section((row.get("取締項目") or "")):
+            stats["skipped_section_row"] += 1
+            continue
         stats[f"enforcement:{(row.get('取締項目') or '?').strip()}"] += 1
         cameras.append(
             Camera(

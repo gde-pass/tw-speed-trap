@@ -11,6 +11,7 @@ import time
 import urllib.parse
 import zipfile
 
+import certifi
 import requests
 import requests.adapters
 
@@ -18,6 +19,8 @@ DATASET_API = "https://data.gov.tw/api/v2/rest/dataset/{dataset_id}"
 USER_AGENT = "tw-speed-trap-pipeline/0.1 (+https://github.com/gde-pass/tw-speed-trap)"
 TIMEOUT_S = 60
 RETRIES = 3
+MAX_DOWNLOAD_BYTES = 200 * 1024 * 1024
+MAX_ZIP_MEMBER_BYTES = 100 * 1024 * 1024
 
 
 class FetchError(RuntimeError):
@@ -27,11 +30,13 @@ class FetchError(RuntimeError):
 class _RelaxedStrictnessAdapter(requests.adapters.HTTPAdapter):
     """Taiwanese government certificates (GRCA-issued, e.g. tgos.tw) often
     lack the Subject Key Identifier extension, which Python 3.13's default
-    VERIFY_X509_STRICT rejects. Keep chain-of-trust verification; drop only
-    the format-strictness flag."""
+    VERIFY_X509_STRICT rejects. Keep chain-of-trust verification (against
+    the same certifi bundle requests normally uses); drop only the
+    format-strictness flag. Resource hosts churn between runs, so this is
+    mounted for the whole session rather than a hardcoded host list."""
 
     def init_poolmanager(self, *args, **kwargs):
-        ctx = ssl.create_default_context()
+        ctx = ssl.create_default_context(cafile=certifi.where())
         ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
         kwargs["ssl_context"] = ctx
         return super().init_poolmanager(*args, **kwargs)
@@ -55,6 +60,11 @@ BROWSER_UA = (
 # their snapshot fallback kicks in.
 _timed_out_hosts: set[str] = set()
 
+# One transient timeout against the dataset API itself must never write off
+# every remaining dataset (and, in dataset-watch, must never make all used
+# datasets read as delisted).
+_NEVER_BLACKLIST = {"data.gov.tw", "www.data.gov.tw"}
+
 
 def _get(url: str) -> requests.Response:
     host = urllib.parse.urlsplit(url).hostname or ""
@@ -71,11 +81,13 @@ def _get(url: str) -> requests.Response:
                 resp.raise_for_status()
                 return resp
             except requests.exceptions.ConnectTimeout as e:
-                _timed_out_hosts.add(host)
+                if host not in _NEVER_BLACKLIST:
+                    _timed_out_hosts.add(host)
                 raise FetchError(f"failed to fetch {url}: {e}") from e
             except Exception as e:  # noqa: BLE001 - retry on any transport error
                 last_error = e
-        time.sleep(2**attempt)
+        if attempt < RETRIES - 1:
+            time.sleep(2**attempt)
     raise FetchError(f"failed to fetch {url}: {last_error}")
 
 
@@ -84,14 +96,22 @@ def resolve_csv_url(dataset_id: int) -> str:
     data = _get(DATASET_API.format(dataset_id=dataset_id)).json()
     if not data.get("success"):
         raise FetchError(f"dataset API returned success=false for {dataset_id}")
-    for dist in data["result"]["distribution"]:
+    try:
+        distributions = data["result"]["distribution"]
+    except (KeyError, TypeError) as e:
+        # A shape change must stay a FetchError so the snapshot fallback applies.
+        raise FetchError(f"dataset API response shape changed for {dataset_id}: {e!r}") from e
+    for dist in distributions:
         if dist.get("resourceFormat", "").upper() == "CSV" and dist.get("resourceDownloadUrl"):
             return dist["resourceDownloadUrl"]
     raise FetchError(f"no CSV resource found for dataset {dataset_id}")
 
 
 def download(url: str) -> bytes:
-    return _get(url).content
+    content = _get(url).content
+    if len(content) > MAX_DOWNLOAD_BYTES:
+        raise FetchError(f"{url}: response larger than {MAX_DOWNLOAD_BYTES} bytes")
+    return content
 
 
 def extract_csv_payloads(data: bytes) -> list[bytes]:
@@ -112,6 +132,8 @@ def extract_csv_payloads(data: bytes) -> list[bytes]:
             continue
         if name.lower().rsplit("/", 1)[-1] == "manifest.csv":  # tgos.tw metadata file
             continue
+        if info.file_size > MAX_ZIP_MEMBER_BYTES:
+            raise FetchError(f"ZIP member {name} decompresses to {info.file_size} bytes; refusing")
         payloads.append(zf.read(info))
     if not payloads:
         raise FetchError("ZIP archive contained no usable CSV member")

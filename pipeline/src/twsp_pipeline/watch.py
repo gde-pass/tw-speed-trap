@@ -32,6 +32,11 @@ OK_SENTINEL = "DATASET-WATCH: OK"
 def catalog_matches(catalog_csv: str, keywords: re.Pattern) -> dict[str, str]:
     """id -> title for every catalog row whose title matches the keywords."""
     reader = csv.DictReader(io.StringIO(catalog_csv.lstrip("\ufeff")))
+    found = set(reader.fieldnames or [])
+    if not {"資料集識別碼", "資料集名稱"} <= found:
+        # Fail loudly with the actual columns: the workflow must go red, not
+        # quietly report "nothing new upstream".
+        raise SystemExit(f"catalog export columns changed: {sorted(found)[:12]}")
     return {
         row["資料集識別碼"]: (row["資料集名稱"] or "").strip()
         for row in reader
@@ -45,7 +50,10 @@ def new_datasets(matches: dict[str, str], baseline: dict) -> dict[str, str]:
         | {str(i) for i in baseline.get("seen", {})}
         | {str(i) for i in baseline.get("waiting_for_coordinates", {})}
     )
-    return {i: title for i, title in sorted(matches.items(), key=lambda kv: int(kv[0])) if i not in known}
+    def sort_key(kv: tuple[str, str]) -> int:
+        return int(kv[0]) if kv[0].isdigit() else 10**12  # non-numeric ids sort last, never crash
+
+    return {i: title for i, title in sorted(matches.items(), key=sort_key) if i not in known}
 
 
 def dataset_listed(dataset_id: int) -> bool:
@@ -107,7 +115,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.catalog:
         catalog_csv = args.catalog.read_text(encoding="utf-8")
     else:
-        catalog_csv = _get(CATALOG_EXPORT_URL).content.decode("utf-8-sig")
+        # decode_bytes, not a hardcoded utf-8-sig: an encoding change upstream
+        # must not crash the monthly watch.
+        catalog_csv = decode_bytes(_get(CATALOG_EXPORT_URL).content)
     matches = catalog_matches(catalog_csv, keywords)
     print(f"catalog: {len(matches)} keyword-matching datasets", file=sys.stderr)
 

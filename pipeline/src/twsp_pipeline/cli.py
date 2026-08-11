@@ -134,6 +134,12 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("app/src/main/assets/cameras.db"),
         help="previous database used to keep a source's rows when its host is unreachable",
     )
+    parser.add_argument(
+        "--min-count",
+        type=int,
+        default=2000,
+        help="refuse to emit fewer cameras than this (a truncated upstream day must not reach installs)",
+    )
     args = parser.parse_args(argv)
 
     # Minute precision so a same-day data fix still reads as newer to
@@ -144,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     all_unresolved: list[Unresolved] = []
     stats: Counter = Counter()
 
-    stale_sources: list[str] = []
+    stale_sources: list[tuple[str, str]] = []
     for dataset_id, parse_fn, source in DATASETS:
         print(f"dataset {dataset_id}:")
         try:
@@ -156,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise
             print(f"  KEEPING PREVIOUS SNAPSHOT: {len(previous)} cameras (last seen {previous[0].last_seen})")
             all_cameras.extend(previous)
-            stale_sources.append(source)
+            stale_sources.append((source, previous[0].last_seen))
             continue
         for text in texts:
             cameras, unresolved, source_stats = parse_fn(text, today)
@@ -181,6 +187,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {key.split(':', 1)[1]}")
     deduped = deduped + section_cameras
 
+    if len(deduped) < args.min_count:
+        print(
+            f"\nERROR: only {len(deduped)} cameras built, below --min-count {args.min_count}; "
+            "refusing to emit — a truncated upstream day must not auto-update every install."
+        )
+        return 1
+
     db_path = args.out / "cameras.db"
     manifest_path = args.out / "manifest.json"
     write_sqlite(deduped, db_path, today, sections)
@@ -202,7 +215,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"top cities: {by_city.most_common(10)}")
     print(f"unresolved rows: {len(all_unresolved)} (see {args.out / 'unresolved.csv'})")
     if stale_sources:
-        print(f"STALE SOURCES (host unreachable, previous snapshot kept): {stale_sources}")
+        print("STALE SOURCES (host unreachable, previous snapshot kept):")
+        now = datetime.now(timezone.utc)
+        for source, last_seen in stale_sources:
+            try:
+                age_days = (now - datetime.strptime(last_seen, "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)).days
+                age = f"{age_days} days old"
+            except ValueError:
+                age = "age unknown"
+            print(f"  {source}: last refreshed {last_seen} ({age})")
     notable = {k: v for k, v in stats.items() if not k.startswith("bearing_both")}
     print(f"source stats: {notable}")
     print(f"data_version: {manifest['data_version']}, content_hash: {manifest['content_hash'][:12]}…")

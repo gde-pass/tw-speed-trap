@@ -50,3 +50,31 @@ def test_missing_columns_fail_loudly():
         parse_7320("foo,bar\n1,2\n", "2026-08-11")
     with pytest.raises(SchemaError):
         parse_13940("foo,bar\n1,2\n", "2026-08-11")
+
+
+def test_7320_excludes_section_rows():
+    from twsp_pipeline.parse import parse_7320
+
+    text = (
+        "CityName,RegionName,Address,DeptNm,BranchNm,Longitude,Latitude,direct,limit\n"
+        "臺北市,文山區,辛亥隧道區間測速,臺北市政府警察局,文山第二分局,121.5559,25.011496,南向北,50\n"
+        "臺北市,文山區,辛亥路三段,臺北市政府警察局,文山第二分局,121.5560,25.011500,南向北,50\n"
+    )
+    cameras, unresolved, stats = parse_7320(text, "2026-08-12")
+    assert [c.description for c in cameras] == ["辛亥路三段"]
+    assert stats["skipped_section_row"] == 1
+    assert not unresolved
+
+
+def test_13940_excludes_section_rows():
+    from twsp_pipeline.parse import parse_13940
+
+    text = (
+        "設備編號,設置區域描述,縣市,設置地點,取締項目,座標緯度,座標經度,拍攝方向,速限\n"
+        "9001,,國道,國道五號雪山隧道區間測速,區間平均速率,24.762,121.674,往南,90\n"
+        "9002,,國道,國道一號南向100公里,超速,24.900,121.100,往南,110\n"
+    )
+    cameras, unresolved, stats = parse_13940(text, "2026-08-12")
+    assert [c.description for c in cameras] == ["國道一號南向100公里"]
+    assert stats["skipped_section_row"] == 1
+    assert not unresolved
