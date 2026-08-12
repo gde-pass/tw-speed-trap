@@ -441,13 +441,19 @@ def parse_177827(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
 
 
 def _parse_county_standard(
-    text: str, today: str, source: str, place_col: str, items_col: str
+    text: str, today: str, source: str, place_cols: tuple[str, ...], items_cols: tuple[str, ...]
 ) -> tuple[list[Camera], list[Unresolved], Counter]:
     """Shared county open-data shape (彰化/基隆/澎湖): 13940-family Chinese
     columns, with per-county suffix variations on the location and items
-    column names. Speed-measuring rows stay `fixed` so they dedupe against
-    their national 7320 twins (彰化's list is byte-identical positions)."""
+    column names. Those names drift upstream (澎湖 172940 dropped the
+    (路口或路段) suffix in 2026-08), so both are candidate lists — the first
+    present in the header wins; none present still raises SchemaError.
+    Speed-measuring rows stay `fixed` so they dedupe against their national
+    7320 twins (彰化's list is byte-identical positions)."""
     reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    fields = set(reader.fieldnames or ())
+    place_col = next((c for c in place_cols if c in fields), place_cols[0])
+    items_col = next((c for c in items_cols if c in fields), items_cols[0])
     _require_columns(
         reader.fieldnames, {"縣市", "行政區", place_col, items_col, "座標緯度", "座標經度", "拍攝方向", "速限"}, source
     )
@@ -497,23 +503,27 @@ def _parse_county_standard(
 
 def parse_172905(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
     """Changhua tech enforcement (彰化縣警察局固定式科技執法設備設置地點)."""
-    return _parse_county_standard(text, today, SOURCE_172905, "設置地點", "取締項目")
+    return _parse_county_standard(text, today, SOURCE_172905, ("設置地點",), ("取締項目",))
+
+
+_SUFFIXED_PLACE_COLS = ("設置地點(路口或路段)", "設置地點")
+_SUFFIXED_ITEMS_COLS = ('取締項目(以"、"分隔)', "取締項目")
 
 
 def parse_178159(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
     """Keelung tech enforcement (基隆市科技執法取締地點)."""
-    return _parse_county_standard(text, today, SOURCE_178159, "設置地點(路口或路段)", '取締項目(以"、"分隔)')
+    return _parse_county_standard(text, today, SOURCE_178159, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)
 
 
 def parse_156415(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
     """Penghu fixed cameras (澎湖縣固定測速照相設置地點表)."""
-    return _parse_county_standard(text, today, SOURCE_156415, "設置地點(路口或路段)", '取締項目(以"、"分隔)')
+    return _parse_county_standard(text, today, SOURCE_156415, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)
 
 
 def parse_172940(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
     """Penghu tech enforcement (澎湖縣科技執法地點); overlaps 156415 at shared
     intersections — both classify speed rows `fixed`, so dedupe collapses them."""
-    return _parse_county_standard(text, today, SOURCE_172940, "設置地點(路口或路段)", '取締項目(以"、"分隔)')
+    return _parse_county_standard(text, today, SOURCE_172940, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)
 
 
 def _parse_yunlin(text: str, today: str, source: str) -> tuple[list[Camera], list[Unresolved], Counter]:

@@ -225,6 +225,26 @@ def test_county_standard_parser_variants():
     assert cameras[0].id != cameras[1].id  # per-direction gantries stay distinct
 
 
+# 澎湖 172940 renamed its columns in 2026-08: 設置地點(路口或路段) became plain
+# 設置地點 (and likewise for 取締項目), matching the 彰化 shape. Header copied
+# from the live download that broke the 2026-08-12 data-update run.
+CSV_172940_RENAMED = """設備編號,型式,縣市,行政區,科技執法種類,取締項目,設置地點,座標緯度,座標經度,拍攝方向,速限,轄區分局
+1,雷達,澎湖縣,馬公市,路口多功能執法,超速、闖紅燈,民族路與中正路口,23.565897,119.566417,東西雙向,50,馬公分局
+"""
+
+
+def test_county_parser_accepts_renamed_columns():
+    cameras, unresolved, _ = parse_172940(CSV_172940_RENAMED, "2026-08-12")
+    assert not unresolved
+    assert len(cameras) == 1
+    assert cameras[0].type == "fixed"  # 超速 present
+    assert cameras[0].description == "馬公市 民族路與中正路口"
+    assert cameras[0].speed_limit == 50
+    # the old suffixed header keeps parsing too
+    old, unresolved, _ = parse_178159(CSV_178159, "2026-08-11")
+    assert not unresolved and len(old) == 2
+
+
 def test_yunlin_skips_embedded_chinese_header():
     cameras, unresolved, stats = parse_178085(CSV_178085, "2026-08-11")
     assert not unresolved
