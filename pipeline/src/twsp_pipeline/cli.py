@@ -12,6 +12,7 @@ from .decode import decode_bytes
 from .dedupe import collapse_id_duplicates, dedupe
 from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
 from .fetch import FetchError, download, extract_csv_payloads, resolve_csv_url
+from .freeway_check import check_freeway_markers
 from .model import Camera, Unresolved
 from .parse import (
     SOURCE_130111,
@@ -174,6 +175,11 @@ def main(argv: list[str] | None = None) -> int:
     all_cameras, same_device = collapse_id_duplicates(all_cameras)
     if same_device:
         print(f"\nsame-device rows collapsed: {sum(same_device.values())} ({dict(same_device)})")
+    all_cameras, freeway_dropped, freeway_report = check_freeway_markers(all_cameras)
+    if freeway_dropped or freeway_report:
+        print(f"freeway marker check: dropped {sum(freeway_dropped.values())} ({dict(freeway_dropped)})")
+        for line in freeway_report:
+            print(f"  {line}")
     deduped, dropped = dedupe(all_cameras)
     print(f"dedupe: kept {len(deduped)}, dropped {sum(dropped.values())} ({dict(dropped)})")
 

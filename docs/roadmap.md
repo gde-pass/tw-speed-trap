@@ -40,11 +40,20 @@ management deserves its own change.
 
 ## Known upstream data errors (report to source agencies)
 
-- 7320 lists 國道一號南向279公里 at (25.042383, 121.53301) — Taipei city,
-  ~200 km from km 279. The same device in 13940 is correctly at
-  (23.373209, 120.350715). The mislocated row survives dedupe because the
-  positions differ; it produces a spurious freeway-camera alert on 建國高架
-  in Taipei. Recheck after the next 7320 refresh.
+Mislocated freeway rows are now auto-suppressed by the pipeline
+(`freeway_check.py`): straight-line distance between two 國道 kilometre
+markers can never exceed their km difference, so rows violating that
+bound against ≥2 same-freeway rows are dropped and reported in the build
+log. The 2026-08 run caught 15 rows — the long-known 7320 國道一號南向
+279公里 placed on 建國高架 in Taipei (~200 km off; 13940 has the device
+correctly at 23.373209, 120.350715), plus shared-geocode errors present
+in *both* national sets (N1 66.6/68 placed in the 五峰 mountains, N1
+26.8/35.56, N3 218.9/284.07) and 13940-only ones (N3 262.01 ~40 km off).
+The same module also merges cross-source rows carrying an identical
+marker up to 1 km apart (previous dedupe radius was 45 m), removing
+double alerts for one device geocoded twice (e.g. N3 313.7 at 335 m,
+N4 4.4 at 613 m). Still worth reporting upstream — suppression loses the
+device entirely when both sources share the wrong geocode.
 
 ## CI: bot data commits skip CI
 
