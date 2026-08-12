@@ -43,7 +43,7 @@
     <string name="alert_fixed_camera">Fixed camera, %1$d metres</string>
     <string name="alert_fixed_camera_limit">Fixed camera, %1$d metres, limit %2$d</string>
     <string name="alert_red_light_camera">Red-light camera, %1$d metres</string>
-    <string name="alert_tech_enforcement">Tech enforcement, %1$d metres</string>
+    <string name="alert_tech_enforcement">Behavior camera, %1$d metres</string>
     <string name="alert_mobile_camera">Mobile camera, %1$d metres</string>
     <string name="alert_location_off">Location turned off, alerts disabled</string>
     <string name="alert_location_on">Location restored</string>
