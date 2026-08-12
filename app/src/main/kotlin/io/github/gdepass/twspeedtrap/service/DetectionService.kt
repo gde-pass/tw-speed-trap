@@ -70,12 +70,7 @@ class DetectionService : LifecycleService() {
     private fun startDetection() {
         // Every start request must reach startForeground, including redundant
         // ones while already running (Bluetooth auto-start, notification tap).
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            buildNotification(lastNotificationText ?: getString(R.string.notif_starting)),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-        )
+        if (!startForegroundOrDegrade()) return
         if (detectionJob != null) return
 
         detectionJob =
@@ -90,6 +85,34 @@ class DetectionService : LifecycleService() {
                     reportFailure(e)
                 }
             }
+    }
+
+    /** Android 14+ rejects a location-type foreground service started while
+     * the app is in the background without an "all the time" location grant —
+     * a SecurityException here, which must never take the process down (the
+     * Bluetooth auto-start receiver reaches this from a cold background
+     * start). Degrade to the tap-to-start notification instead of crashing. */
+    private fun startForegroundOrDegrade(): Boolean =
+        try {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                buildNotification(lastNotificationText ?: getString(R.string.notif_starting)),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+            )
+            true
+        } catch (e: SecurityException) {
+            degradeToTapToStart(e)
+            false
+        } catch (e: IllegalStateException) {
+            degradeToTapToStart(e)
+            false
+        }
+
+    private fun degradeToTapToStart(e: Exception) {
+        Log.e(TAG, "startForeground rejected, degrading to tap-to-start", e)
+        TapToStart.post(this)
+        stopSelf()
     }
 
     private suspend fun runDetection() {
