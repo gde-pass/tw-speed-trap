@@ -174,6 +174,20 @@ class AlertEngineTest {
     }
 
     @Test
+    fun `an implausibly distant pending camera is forgotten even on bad fixes`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // 2 km away with garbage accuracy and no speed: no ring is that big,
+        // so the pending pass must clear instead of sticking forever.
+        val far =
+            engine.onFix(
+                fix(camera.lat + 2000 * degPerMeterLat, speedKmh = 0.0, bearing = null, accuracy = 300.0),
+            )
+        assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), far)
+        assertTrue(engine.activeAlert == null)
+    }
+
+    @Test
     fun `a noisy close fix must not ratchet the closest approach`() {
         val engine = AlertEngine(listOf(camera))
         assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)

@@ -95,11 +95,6 @@ class OverlayBubble(
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val strokeGlyphPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = Color.WHITE
-        }
     private val strokePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -116,7 +111,11 @@ class OverlayBubble(
             color = Color.WHITE
             isFakeBoldText = true
         }
-    private val pillTextPaint =
+    private val emojiPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+        }
+    private val signTextPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
             textAlign = Paint.Align.CENTER
@@ -125,10 +124,9 @@ class OverlayBubble(
 
     init {
         strokePaint.strokeWidth = hPx * 0.045f
-        strokeGlyphPaint.strokeWidth = hPx * 0.03f
         valuePaint.textSize = hPx * 0.26f
         unitPaint.textSize = hPx * 0.13f
-        pillTextPaint.textSize = hPx * 0.19f
+        emojiPaint.textSize = hPx * 0.30f
         contentDescription = context.getString(R.string.btn_start)
     }
 
@@ -192,7 +190,7 @@ class OverlayBubble(
                 drawAlert(canvas, s)
             }
             is BubbleState.Section -> {
-                drawCard(canvas, COLOR_SECTION)
+                drawCard(canvas, COLOR_ALERT)
                 drawSection(canvas, s)
             }
         }
@@ -222,20 +220,14 @@ class OverlayBubble(
         canvas.drawRoundRect(rect, corner, corner, strokePaint)
     }
 
-    /** Type glyph always on show; the limit pill joins it when the limit is known. */
+    /** Type emoji always on show; the limit sign joins it when the limit is known. */
     private fun drawAlert(
         canvas: Canvas,
         alert: BubbleState.Alert,
     ) {
-        val hasPill = alert.limitKmh != null
-        val glyphCx = if (hasPill) wPx * 0.28f else wPx / 2f
-        when (alert.type) {
-            CameraType.RED_LIGHT -> drawTrafficLightGlyph(canvas, glyphCx)
-            CameraType.MOBILE -> drawMobileGlyph(canvas, glyphCx)
-            CameraType.TECH -> drawEyeGlyph(canvas, glyphCx)
-            else -> drawCameraGlyph(canvas, glyphCx)
-        }
-        if (alert.limitKmh != null) drawLimitPill(canvas, alert.limitKmh, wPx * 0.68f)
+        val glyphCx = if (alert.limitKmh != null) wPx * 0.27f else wPx / 2f
+        drawEmoji(canvas, emojiFor(alert.type), glyphCx)
+        if (alert.limitKmh != null) drawLimitSign(canvas, alert.limitKmh, wPx * 0.70f)
         drawBottomValue(canvas, "${alert.distanceM}", " m")
     }
 
@@ -243,89 +235,46 @@ class OverlayBubble(
         canvas: Canvas,
         section: BubbleState.Section,
     ) {
-        drawLimitPill(canvas, section.limitKmh, wPx / 2f)
+        drawEmoji(canvas, SECTION_EMOJI, wPx * 0.27f)
+        drawLimitSign(canvas, section.limitKmh, wPx * 0.70f)
         drawBottomValue(canvas, "${section.projectedKmh}", " km/h")
     }
 
-    /** Mini speed-sign: white pill, black limit number. */
-    private fun drawLimitPill(
+    private fun emojiFor(type: CameraType): String =
+        when (type) {
+            CameraType.RED_LIGHT -> "🚦"
+            CameraType.TECH -> "👀"
+            CameraType.MOBILE -> "🚓"
+            else -> "📸"
+        }
+
+    private fun drawEmoji(
+        canvas: Canvas,
+        emoji: String,
+        cx: Float,
+    ) {
+        val cy = hPx * TOP_SLOT_CENTER
+        val baseline = cy - (emojiPaint.ascent() + emojiPaint.descent()) / 2f
+        canvas.drawText(emoji, cx, baseline, emojiPaint)
+    }
+
+    /** Taiwan-style speed sign: white halo (so the ring reads on the red
+     * card), red ring, white disc, big black number. */
+    private fun drawLimitSign(
         canvas: Canvas,
         limitKmh: Int,
         cx: Float,
     ) {
         val cy = hPx * TOP_SLOT_CENTER
-        val halfH = hPx * 0.13f
-        val halfW = maxOf(hPx * 0.19f, pillTextPaint.measureText("$limitKmh") / 2f + hPx * 0.06f)
         glyphPaint.color = Color.WHITE
-        val rect = RectF(cx - halfW, cy - halfH, cx + halfW, cy + halfH)
-        canvas.drawRoundRect(rect, halfH, halfH, glyphPaint)
-        val baseline = cy - (pillTextPaint.ascent() + pillTextPaint.descent()) / 2f
-        canvas.drawText("$limitKmh", cx, baseline, pillTextPaint)
-    }
-
-    /** Three stacked light dots in a dark housing: red-light camera ahead. */
-    private fun drawTrafficLightGlyph(
-        canvas: Canvas,
-        cx: Float,
-    ) {
-        glyphPaint.color = COLOR_LIGHT_HOUSING
-        val halfW = hPx * 0.095f
-        val rect = RectF(cx - halfW, hPx * 0.10f, cx + halfW, hPx * 0.50f)
-        canvas.drawRoundRect(rect, halfW * 0.6f, halfW * 0.6f, glyphPaint)
-        val radius = hPx * 0.047f
-        listOf(0.17f to COLOR_LIGHT_RED, 0.30f to COLOR_LIGHT_AMBER, 0.43f to COLOR_LIGHT_GREEN)
-            .forEach { (yFraction, color) ->
-                glyphPaint.color = color
-                canvas.drawCircle(cx, hPx * yFraction, radius, glyphPaint)
-            }
-    }
-
-    /** White camera body with a punched-out lens: fixed camera. */
-    private fun drawCameraGlyph(
-        canvas: Canvas,
-        cx: Float,
-    ) {
-        val cy = hPx * TOP_SLOT_CENTER
+        canvas.drawCircle(cx, cy, hPx * 0.205f, glyphPaint)
+        glyphPaint.color = COLOR_SIGN_RING
+        canvas.drawCircle(cx, cy, hPx * 0.180f, glyphPaint)
         glyphPaint.color = Color.WHITE
-        val halfW = hPx * 0.155f
-        val halfH = hPx * 0.115f
-        val body = RectF(cx - halfW, cy - halfH, cx + halfW, cy + halfH)
-        canvas.drawRoundRect(body, hPx * 0.035f, hPx * 0.035f, glyphPaint)
-        glyphPaint.color = fillPaint.color
-        canvas.drawCircle(cx, cy, hPx * 0.062f, glyphPaint)
-    }
-
-    /** Camera on tripod legs: mobile enforcement. */
-    private fun drawMobileGlyph(
-        canvas: Canvas,
-        cx: Float,
-    ) {
-        val cy = hPx * 0.26f
-        glyphPaint.color = Color.WHITE
-        val halfW = hPx * 0.14f
-        val halfH = hPx * 0.10f
-        val body = RectF(cx - halfW, cy - halfH, cx + halfW, cy + halfH)
-        canvas.drawRoundRect(body, hPx * 0.03f, hPx * 0.03f, glyphPaint)
-        glyphPaint.color = fillPaint.color
-        canvas.drawCircle(cx, cy, hPx * 0.055f, glyphPaint)
-        canvas.drawLine(cx - hPx * 0.06f, cy + halfH, cx - hPx * 0.13f, hPx * 0.52f, strokeGlyphPaint)
-        canvas.drawLine(cx + hPx * 0.06f, cy + halfH, cx + hPx * 0.13f, hPx * 0.52f, strokeGlyphPaint)
-    }
-
-    /** Watching eye: tech / behaviour enforcement. */
-    private fun drawEyeGlyph(
-        canvas: Canvas,
-        cx: Float,
-    ) {
-        val cy = hPx * TOP_SLOT_CENTER
-        glyphPaint.color = Color.WHITE
-        canvas.save()
-        canvas.translate(cx, cy)
-        canvas.scale(1.6f, 1f)
-        canvas.drawCircle(0f, 0f, hPx * 0.115f, glyphPaint)
-        canvas.restore()
-        glyphPaint.color = fillPaint.color
-        canvas.drawCircle(cx, cy, hPx * 0.065f, glyphPaint)
+        canvas.drawCircle(cx, cy, hPx * 0.132f, glyphPaint)
+        signTextPaint.textSize = if (limitKmh >= 100) hPx * 0.15f else hPx * 0.20f
+        val baseline = cy - (signTextPaint.ascent() + signTextPaint.descent()) / 2f
+        canvas.drawText("$limitKmh", cx, baseline, signTextPaint)
     }
 
     private fun drawPlayGlyph(canvas: Canvas) {
@@ -424,14 +373,13 @@ class OverlayBubble(
         private const val QUIET_SIZE_DP = 72f
         private const val TOP_SLOT_CENTER = 0.30f
         private const val BOTTOM_SLOT_CENTER = 0.71f
+        private const val SECTION_EMOJI = "⏱️"
         private val COLOR_IDLE = Color.rgb(0x54, 0x6E, 0x7A)
         private val COLOR_NO_GPS = Color.rgb(0xF9, 0xA8, 0x25)
         private val COLOR_CLEAR = Color.rgb(0x2E, 0x7D, 0x32)
         private val COLOR_ALERT = Color.rgb(0xC6, 0x28, 0x28)
-        private val COLOR_SECTION = Color.rgb(0xAB, 0x47, 0xBC)
-        private val COLOR_LIGHT_HOUSING = Color.rgb(0x26, 0x32, 0x38)
-        private val COLOR_LIGHT_RED = Color.rgb(0xFF, 0x52, 0x52)
-        private val COLOR_LIGHT_AMBER = Color.rgb(0xFF, 0xC1, 0x07)
-        private val COLOR_LIGHT_GREEN = Color.rgb(0x66, 0xBB, 0x6A)
+
+        /** Traffic-sign red, slightly darker than the card so the halo carries the separation. */
+        private val COLOR_SIGN_RING = Color.rgb(0xB7, 0x1C, 0x1C)
     }
 }

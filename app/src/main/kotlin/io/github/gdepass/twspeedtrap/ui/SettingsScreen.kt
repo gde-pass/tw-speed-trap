@@ -384,18 +384,30 @@ private fun SliderRow(
     }
 }
 
+/** Label plus the emoji the floating bubble uses for the type — a legend. */
 @Composable
-private fun cameraTypeLabel(type: CameraType): String =
-    stringResource(
+private fun cameraTypeLabel(type: CameraType): String {
+    val label =
+        stringResource(
+            when (type) {
+                CameraType.FIXED -> R.string.type_fixed
+                CameraType.MOBILE -> R.string.type_mobile
+                CameraType.RED_LIGHT -> R.string.type_red_light
+                CameraType.SECTION -> R.string.type_section
+                CameraType.TECH -> R.string.type_tech
+                CameraType.OTHER -> R.string.type_other
+            },
+        )
+    val emoji =
         when (type) {
-            CameraType.FIXED -> R.string.type_fixed
-            CameraType.MOBILE -> R.string.type_mobile
-            CameraType.RED_LIGHT -> R.string.type_red_light
-            CameraType.SECTION -> R.string.type_section
-            CameraType.TECH -> R.string.type_tech
-            CameraType.OTHER -> R.string.type_other
-        },
-    )
+            CameraType.MOBILE -> "🚓"
+            CameraType.RED_LIGHT -> "🚦"
+            CameraType.SECTION -> "⏱️"
+            CameraType.TECH -> "👀"
+            else -> "📸"
+        }
+    return "$label $emoji"
+}
 
 private fun overlayPermissionIntent(context: Context): Intent =
     Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))

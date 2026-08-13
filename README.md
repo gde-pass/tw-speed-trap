@@ -40,8 +40,8 @@ detection** without opening the app.
 | **Grey circle, play glyph** | Detection is off. Tap to start it (tap again anytime to stop). |
 | **Amber circle, !** | Detection is running but blind: location services are off, or no GPS fix has arrived yet. Never trust a ride to an amber bubble. |
 | **Green circle** | Detection running, GPS locked, nothing ahead — all clear. |
-| **Red card** | A camera alert is active: a glyph shows the camera type (camera = fixed, tripod = mobile, traffic light = red-light, eye = tech/behaviour), the white pill its speed limit when known, and the metres count down live until the camera is behind you. |
-| **Purple card** | Average-speed section in progress: the pill shows the section limit, the number is your **projected exit average** — keep it under the pill and the exit announcement stays polite. |
+| **Red card** | A camera alert is active: an emoji shows the type (📸 fixed, 🚓 mobile spot, 🚦 red-light, 👀 tech/behaviour), a round Taiwan-style sign its speed limit when known, and the metres count down live until the camera is behind you. |
+| **Red card, ⏱️** | Average-speed section in progress: the sign shows the section limit, the number is your **projected exit average** — keep it under the sign and the exit announcement stays polite. |
 
 <p>
   <img src="docs/bubble-idle.jpg" width="180" alt="Grey idle bubble with a play glyph: detection off, tap to start">
@@ -49,12 +49,12 @@ detection** without opening the app.
   <img src="docs/bubble-green.jpg" width="180" alt="Green bubble: detection running, all clear">
 </p>
 <p>
-  <img src="docs/bubble-red.jpg" width="180" alt="Red card with camera glyph, limit 50 pill and 249 m countdown for a fixed camera">
-  <img src="docs/bubble-redlight.jpg" width="180" alt="Red card with a traffic-light glyph and 47 m countdown for a red-light camera">
-  <img src="docs/bubble-tech.jpg" width="180" alt="Red card with an eye glyph and 250 m countdown for a tech-enforcement camera">
+  <img src="docs/bubble-red.jpg" width="180" alt="Red card with the camera emoji, a round limit-50 sign and 249 m countdown for a fixed camera">
+  <img src="docs/bubble-redlight.jpg" width="180" alt="Red card with the traffic-light emoji and 47 m countdown for a red-light camera">
+  <img src="docs/bubble-tech.jpg" width="180" alt="Red card with the eyes emoji and 250 m countdown for a tech-enforcement camera">
 </p>
 <p>
-  <img src="docs/bubble-section.jpg" width="180" alt="Purple card with the section limit 70 pill and the projected exit average">
+  <img src="docs/bubble-section.jpg" width="180" alt="Red card with the stopwatch emoji, the round section limit-70 sign and the projected exit average">
 </p>
 
 ## How to install
@@ -150,7 +150,9 @@ Open the gear icon (top right):
 - **Start detection when Bluetooth connects** — optional auto-start when
   your helmet intercom (or any Bluetooth device) connects; grant the
   Bluetooth permission when the settings row asks for it.
-- **Announced camera types** — pick which camera families speak.
+- **Announced camera types** — pick which camera families speak; each row
+  carries the emoji the bubble uses for that type (📸 🚓 🚦 ⏱️ 👀), so the
+  list doubles as the legend.
 - **Automatic weekly update** — the camera database refreshes itself over
   Wi-Fi by default; no app update needed for new cameras.
 

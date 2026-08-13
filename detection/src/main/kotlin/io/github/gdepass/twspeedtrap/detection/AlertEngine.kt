@@ -121,13 +121,20 @@ class AlertEngine(
         fix: Fix,
         pending: PendingPass,
         distance: Double,
-    ): Boolean {
-        if (fix.accuracyM > PASS_ACCURACY_GATE_M) return false
-        if (isBehind(fix, pending.camera)) return true
-        if (fix.speedMps < config.minSpeedForBearingMps) return false
-        pending.minDistanceM = min(pending.minDistanceM, distance)
-        return distance > pending.minDistanceM + PASS_CLEAR_MARGIN_M
-    }
+    ): Boolean =
+        when {
+            // Far beyond any alert ring the camera is unambiguously not
+            // ahead: forget it even on untrusted fixes, or a pending pass
+            // could stick forever through persistently poor accuracy.
+            distance > PASS_FORGET_DISTANCE_M -> true
+            fix.accuracyM > PASS_ACCURACY_GATE_M -> false
+            isBehind(fix, pending.camera) -> true
+            fix.speedMps < config.minSpeedForBearingMps -> false
+            else -> {
+                pending.minDistanceM = min(pending.minDistanceM, distance)
+                distance > pending.minDistanceM + PASS_CLEAR_MARGIN_M
+            }
+        }
 
     /** Returns the distance when the camera is relevant to this fix, else null. */
     private fun evaluate(
@@ -204,6 +211,9 @@ class AlertEngine(
 
         /** Fixes with worse accuracy than this decide nothing about passing a camera. */
         const val PASS_ACCURACY_GATE_M = 50.0
+
+        /** Beyond this distance a pending pass is forgotten regardless of fix quality. */
+        const val PASS_FORGET_DISTANCE_M = 1_500.0
 
         fun angularDifference(
             a: Double,
