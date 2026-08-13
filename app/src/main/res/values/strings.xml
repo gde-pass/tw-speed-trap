@@ -66,7 +66,12 @@
     <string name="settings_alerts">Alerts</string>
     <string name="settings_applies_next_start">Detection is running — changes apply the next time it starts.</string>
     <string name="settings_chime">Chime before announcements</string>
-    <string name="settings_lead_time">Alert lead time: %1$d s before the camera</string>
+    <string name="settings_all_clear_chime">Chime once the camera is passed</string>
+    <string name="settings_overlay_bubble">Floating bubble over other apps</string>
+    <string name="settings_overlay_permission_missing">“Display over other apps” permission missing — the bubble cannot appear.</string>
+    <string name="settings_overlay_permission_grant">Allow display over other apps</string>
+    <string name="settings_alert_distance">Alert distance below 100 km/h: %1$d m</string>
+    <string name="settings_alert_distance_high">Alert distance above 100 km/h: %1$d m</string>
     <string name="settings_tolerance">Speed tolerance: +%1$d km/h</string>
     <string name="settings_auto_stop">Stop detection after 10 min stationary</string>
     <string name="settings_auto_start_bt">Start detection when Bluetooth connects</string>

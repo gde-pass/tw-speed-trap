@@ -167,7 +167,11 @@ private fun Legend(modifier: Modifier = Modifier) {
                             .size(10.dp)
                             .background(TYPE_COLORS.getValue(type), CircleShape),
                 )
-                Text(stringResource(label), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    stringResource(label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
         }
     }

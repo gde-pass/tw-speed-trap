@@ -61,12 +61,12 @@ class MunicipalReplayTest {
     @Test
     fun `southbound Taipei pass fires one red-light alert within limit`() {
         val events = GpxReplay.replay(AlertEngine(cameras), fixes("taipei_chengde_southbound.gpx"))
-        assertEquals(1, events.size, "one pass, one alert")
-        val alert = events.single() as AlertEvent.CameraAhead
+        val alert = events.filterIsInstance<AlertEvent.CameraAhead>().single()
         assertEquals("3b048043d787", alert.camera.id)
         assertEquals(CameraType.RED_LIGHT, alert.camera.type)
-        assertTrue(alert.distanceM in 150.0..250.0, "expected the ~200 m alert ring, got ${alert.distanceM}")
+        assertTrue(alert.distanceM in 250.0..300.0, "expected the 300 m alert ring, got ${alert.distanceM}")
         assertTrue(!alert.overLimit, "50 km/h at limit 50 must not warn")
+        assertEquals(1, events.filterIsInstance<AlertEvent.AllClear>().size, "one pass, one all-clear")
     }
 
     @Test
@@ -74,7 +74,10 @@ class MunicipalReplayTest {
         val reversed = fixes("taipei_chengde_southbound.gpx").asReversed()
         val northbound =
             GpxReplay.toFixes(reversed.mapIndexed { i, f -> GpxReplay.TrackPoint(f.lat, f.lon, i * 1000L) })
-        val events = GpxReplay.replay(AlertEngine(cameras), northbound)
+        // The reversed track starts stationary just past the camera; a real
+        // ride starting there would legitimately alert (speed-0 fail-safe
+        // skips the bearing filter), so replay from the first moving fix.
+        val events = GpxReplay.replay(AlertEngine(cameras), northbound.drop(1))
         assertTrue(events.isEmpty(), "camera enforces southbound; northbound pass must stay silent")
     }
 
@@ -84,13 +87,17 @@ class MunicipalReplayTest {
         val redLightPass = GpxReplay.replay(AlertEngine(cameras, config), fixes("taipei_chengde_southbound.gpx"))
         assertTrue(redLightPass.isEmpty(), "RED_LIGHT disabled must silence the Taipei camera")
         val techPass = GpxReplay.replay(AlertEngine(cameras, config), fixes("taichung_taiwan_blvd_eastbound.gpx"))
-        assertEquals(1, techPass.size, "TECH stays enabled and must still alert")
+        assertEquals(
+            1,
+            techPass.filterIsInstance<AlertEvent.CameraAhead>().size,
+            "TECH stays enabled and must still alert",
+        )
     }
 
     @Test
     fun `Kaohsiung 115-series red-light camera alerts southbound at its limit`() {
         val events = GpxReplay.replay(AlertEngine(cameras), fixes("kaohsiung_minzu_southbound.gpx"))
-        val alert = events.single() as AlertEvent.CameraAhead
+        val alert = events.filterIsInstance<AlertEvent.CameraAhead>().single()
         assertEquals("5471f81fb43f", alert.camera.id)
         assertEquals(CameraType.RED_LIGHT, alert.camera.type)
         assertEquals(60, alert.camera.speedLimitKmh)
@@ -101,7 +108,7 @@ class MunicipalReplayTest {
     fun `bearingless Taichung tech point alerts regardless of direction`() {
         val eastbound = fixes("taichung_taiwan_blvd_eastbound.gpx")
         val events = GpxReplay.replay(AlertEngine(cameras), eastbound)
-        val alert = events.single() as AlertEvent.CameraAhead
+        val alert = events.filterIsInstance<AlertEvent.CameraAhead>().single()
         assertEquals(CameraType.TECH, alert.camera.type)
 
         val westbound =
@@ -109,6 +116,10 @@ class MunicipalReplayTest {
                 eastbound.asReversed().mapIndexed { i, f -> GpxReplay.TrackPoint(f.lat, f.lon, i * 1000L) },
             )
         val reverse = GpxReplay.replay(AlertEngine(cameras), westbound)
-        assertEquals(1, reverse.size, "null bearing means both directions alert")
+        assertEquals(
+            1,
+            reverse.filterIsInstance<AlertEvent.CameraAhead>().size,
+            "null bearing means both directions alert",
+        )
     }
 }

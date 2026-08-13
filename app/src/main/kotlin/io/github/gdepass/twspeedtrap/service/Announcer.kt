@@ -67,6 +67,7 @@ class Announcer(
         onVoiceStatus(voiceMissing)
         tts.setAudioAttributes(attributes)
         tts.addEarcon(EARCON_CHIME, context.packageName, R.raw.chime)
+        tts.addEarcon(EARCON_ALL_CLEAR, context.packageName, R.raw.all_clear)
         tts.setOnUtteranceProgressListener(
             object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) = Unit
@@ -104,6 +105,15 @@ class Announcer(
         tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
     }
 
+    /** Descending two-tone earcon, no speech: the alerted camera is behind. */
+    fun playAllClear() {
+        if (!ready) return
+        audioManager.requestAudioFocus(focusRequest)
+        val utteranceId = "twsp-${utteranceSeq++}"
+        lastUtteranceId = utteranceId
+        tts.playEarcon(EARCON_ALL_CLEAR, TextToSpeech.QUEUE_ADD, null, utteranceId)
+    }
+
     fun release() {
         tts.stop()
         tts.shutdown()
@@ -112,5 +122,6 @@ class Announcer(
 
     companion object {
         private const val EARCON_CHIME = "[twsp_chime]"
+        private const val EARCON_ALL_CLEAR = "[twsp_all_clear]"
     }
 }

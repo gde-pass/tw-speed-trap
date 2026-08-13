@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -19,6 +20,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import io.github.gdepass.twspeedtrap.MainActivity
 import io.github.gdepass.twspeedtrap.R
+import io.github.gdepass.twspeedtrap.data.AppSettings
 import io.github.gdepass.twspeedtrap.data.CameraRepository
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.detection.AlertEngine
@@ -39,6 +41,8 @@ class DetectionService : LifecycleService() {
     private var detectionJob: Job? = null
     private var announcer: Announcer? = null
     private var chimeEnabled = true
+    private var allClearChimeEnabled = false
+    private var overlayBubble: OverlayBubble? = null
     private lateinit var localized: Context
     private var locationMonitor: BroadcastReceiver? = null
     private var lastNotificationText: String? = null
@@ -116,8 +120,11 @@ class DetectionService : LifecycleService() {
     }
 
     private suspend fun runDetection() {
-        val settings = SettingsRepository(applicationContext).settings.first()
+        val settingsRepository = SettingsRepository(applicationContext)
+        val settings = settingsRepository.settings.first()
         chimeEnabled = settings.chimeEnabled
+        allClearChimeEnabled = settings.allClearChimeEnabled
+        showOverlayBubble(settings, settingsRepository)
         // Spoken alerts and notification text follow the app language.
         localized = LocaleOverride.wrap(this@DetectionService, settings.languageTag)
         announcer =
@@ -145,6 +152,7 @@ class DetectionService : LifecycleService() {
                 return@collect
             }
             engine.onFix(fix).forEach(::announce)
+            overlayBubble?.setDistance(engine.activeAlert?.second?.roundToInt())
             val nearest = engine.nearestCamera
             val speedKmh = (fix.speedMps * 3.6).roundToInt()
             DetectionStatus.update {
@@ -164,6 +172,24 @@ class DetectionService : LifecycleService() {
                 updateNotification(rendered.speedKmh, rendered.distanceBucketM)
             }
         }
+    }
+
+    /** The bubble needs the display-over-other-apps permission; without it the
+     * toggle stays a silent no-op rather than crashing the service. */
+    private fun showOverlayBubble(
+        settings: AppSettings,
+        repository: SettingsRepository,
+    ) {
+        if (!settings.overlayBubbleEnabled || !Settings.canDrawOverlays(this) || overlayBubble != null) return
+        overlayBubble =
+            OverlayBubble(this, settings.overlayX, settings.overlayY) { x, y ->
+                lifecycleScope.launch { repository.setOverlayPosition(x, y) }
+            }.also { it.attach() }
+    }
+
+    private fun removeOverlayBubble() {
+        overlayBubble?.detach()
+        overlayBubble = null
     }
 
     /** Detection died (revoked permission, corrupt database, …): the rider
@@ -187,26 +213,10 @@ class DetectionService : LifecycleService() {
 
     private fun announce(event: AlertEvent) {
         when (event) {
-            is AlertEvent.CameraAhead -> {
-                val distance = roundForSpeech(event.distanceM)
-                val limit = event.camera.speedLimitKmh
-                var text =
-                    when (event.camera.type) {
-                        CameraType.RED_LIGHT -> localized.getString(R.string.alert_red_light_camera, distance)
-                        CameraType.TECH -> localized.getString(R.string.alert_tech_enforcement, distance)
-                        CameraType.MOBILE -> localized.getString(R.string.alert_mobile_camera, distance)
-                        else ->
-                            if (limit != null) {
-                                localized.getString(R.string.alert_fixed_camera_limit, distance, limit)
-                            } else {
-                                localized.getString(R.string.alert_fixed_camera, distance)
-                            }
-                    }
-                if (event.overLimit) {
-                    text = localized.getString(R.string.alert_with_warning, text)
-                }
-                Log.i(TAG, "alert: $text (${event.camera.id} at ${event.distanceM.roundToInt()} m)")
-                announcer?.speak(text, chimeEnabled)
+            is AlertEvent.CameraAhead -> announceCameraAhead(event)
+            is AlertEvent.AllClear -> {
+                Log.i(TAG, "all clear (${event.camera.id})")
+                if (allClearChimeEnabled) announcer?.playAllClear()
             }
             is AlertEvent.SectionEntered -> {
                 val text = localized.getString(R.string.alert_section_entered, event.section.speedLimitKmh)
@@ -229,12 +239,35 @@ class DetectionService : LifecycleService() {
         }
     }
 
+    private fun announceCameraAhead(event: AlertEvent.CameraAhead) {
+        val distance = roundForSpeech(event.distanceM)
+        val limit = event.camera.speedLimitKmh
+        var text =
+            when (event.camera.type) {
+                CameraType.RED_LIGHT -> localized.getString(R.string.alert_red_light_camera, distance)
+                CameraType.TECH -> localized.getString(R.string.alert_tech_enforcement, distance)
+                CameraType.MOBILE -> localized.getString(R.string.alert_mobile_camera, distance)
+                else ->
+                    if (limit != null) {
+                        localized.getString(R.string.alert_fixed_camera_limit, distance, limit)
+                    } else {
+                        localized.getString(R.string.alert_fixed_camera, distance)
+                    }
+            }
+        if (event.overLimit) {
+            text = localized.getString(R.string.alert_with_warning, text)
+        }
+        Log.i(TAG, "alert: $text (${event.camera.id} at ${event.distanceM.roundToInt()} m)")
+        announcer?.speak(text, chimeEnabled)
+    }
+
     private fun stopDetection() {
         detectionJob?.cancel()
         detectionJob = null
         lastNotificationText = null
         locationMonitor?.let(::unregisterReceiver)
         locationMonitor = null
+        removeOverlayBubble()
         announcer?.release()
         announcer = null
         DetectionStatus.reset()
@@ -246,6 +279,7 @@ class DetectionService : LifecycleService() {
         detectionJob?.cancel()
         locationMonitor?.let(::unregisterReceiver)
         locationMonitor = null
+        removeOverlayBubble()
         announcer?.release()
         DetectionStatus.reset()
         super.onDestroy()

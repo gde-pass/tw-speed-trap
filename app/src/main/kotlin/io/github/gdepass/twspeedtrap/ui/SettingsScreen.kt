@@ -1,9 +1,12 @@
 package io.github.gdepass.twspeedtrap.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -122,18 +125,30 @@ fun SettingsScreen(
             SwitchRow(stringResource(R.string.settings_chime), settings.chimeEnabled) {
                 scope.launch { repository.setChimeEnabled(it) }
             }
+            SwitchRow(stringResource(R.string.settings_all_clear_chime), settings.allClearChimeEnabled) {
+                scope.launch { repository.setAllClearChimeEnabled(it) }
+            }
             SliderRow(
-                label = stringResource(R.string.settings_lead_time, settings.distanceMultiplier.toInt()),
-                value = settings.distanceMultiplier.toFloat(),
-                range = 6f..20f,
-                steps = 13,
-            ) { scope.launch { repository.setDistanceMultiplier(it.toDouble()) } }
+                label = stringResource(R.string.settings_alert_distance, settings.alertDistanceM),
+                value = settings.alertDistanceM.toFloat(),
+                range = 100f..600f,
+                steps = 9,
+            ) { scope.launch { repository.setAlertDistance(it.toInt()) } }
+            SliderRow(
+                label = stringResource(R.string.settings_alert_distance_high, settings.highSpeedAlertDistanceM),
+                value = settings.highSpeedAlertDistanceM.toFloat(),
+                range = 200f..600f,
+                steps = 7,
+            ) { scope.launch { repository.setHighSpeedAlertDistance(it.toInt()) } }
             SliderRow(
                 label = stringResource(R.string.settings_tolerance, settings.speedToleranceKmh),
                 value = settings.speedToleranceKmh.toFloat(),
                 range = 0f..20f,
                 steps = 19,
             ) { scope.launch { repository.setSpeedTolerance(it.toInt()) } }
+            OverlayBubbleSetting(settings.overlayBubbleEnabled) { enabled ->
+                scope.launch { repository.setOverlayBubbleEnabled(enabled) }
+            }
             SwitchRow(stringResource(R.string.settings_auto_stop), settings.autoStopEnabled) {
                 scope.launch { repository.setAutoStopEnabled(it) }
             }
@@ -302,6 +317,41 @@ private fun BluetoothAutoStartSetting(
     }
 }
 
+/** Toggle plus its display-over-other-apps permission handling: the special
+ * access screen opens when enabling without it, and a visible warning shows
+ * while the toggle is on but the permission is missing — without it the
+ * service cannot attach the bubble. */
+@Composable
+private fun OverlayBubbleSetting(
+    enabled: Boolean,
+    onSetEnabled: (Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    LifecycleResumeEffect(Unit) {
+        refresh++
+        onPauseOrDispose {}
+    }
+
+    fun permissionMissing() = !Settings.canDrawOverlays(context)
+
+    SwitchRow(stringResource(R.string.settings_overlay_bubble), enabled) { on ->
+        if (on && permissionMissing()) context.startActivity(overlayPermissionIntent(context))
+        onSetEnabled(on)
+    }
+    val warn = remember(refresh, enabled) { enabled && permissionMissing() }
+    if (warn) {
+        Text(
+            stringResource(R.string.settings_overlay_permission_missing),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Button(onClick = { context.startActivity(overlayPermissionIntent(context)) }) {
+            Text(stringResource(R.string.settings_overlay_permission_grant))
+        }
+    }
+}
+
 @Composable
 private fun SwitchRow(
     label: String,
@@ -346,6 +396,10 @@ private fun cameraTypeLabel(type: CameraType): String =
             CameraType.OTHER -> R.string.type_other
         },
     )
+
+private fun overlayPermissionIntent(context: Context): Intent =
+    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 private fun installVoicesIntent(): Intent =
     Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

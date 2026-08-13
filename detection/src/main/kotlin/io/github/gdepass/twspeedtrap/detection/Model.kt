@@ -61,6 +61,11 @@ sealed interface AlertEvent {
         val overLimit: Boolean,
     ) : AlertEvent
 
+    /** The camera alerted by the last [CameraAhead] is now behind (or the rider turned away). */
+    data class AllClear(
+        val camera: Camera,
+    ) : AlertEvent
+
     data class SectionEntered(
         val section: Section,
     ) : AlertEvent

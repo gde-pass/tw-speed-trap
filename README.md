@@ -12,15 +12,25 @@ not published on Google Play.
   « Radar fixe, 300 mètres, limite 60 » / "Fixed camera, 300 metres, limit 60",
   with an optional chime, over the navigation audio channel (music ducks,
   Bluetooth helmets work, Android Auto keeps the screen).
-- **1,900+ cameras** from government open data, fully **offline** once
+- **2,500+ cameras** from government open data, fully **offline** once
   installed; the database self-updates weekly over Wi-Fi.
-- Direction-aware (skips cameras facing the other way), speed-scaled alert
-  distance, +10 km/h tolerance (Taiwan's enforcement margin) — all
-  configurable.
+- Direction-aware (skips cameras facing the other way), adjustable alert
+  distances for city and highway speeds, +10 km/h tolerance (Taiwan's
+  enforcement margin) — all configurable.
+- **Floating bubble** over Google Maps (optional): a draggable circle that
+  stays green while the road is clear and turns red with a live metre
+  countdown when a camera is ahead — glanceable without leaving navigation.
+- Optional **all-clear chime** once the camera is behind you — a distinct
+  descending tone, so your ears know the difference from the alert chime.
 - Average-speed sections (區間測速): entry/exit announcements and a
   projected-average warning, correct even through tunnels.
 - No ads, no analytics, no account. Location never leaves the phone; the
   only network traffic is the database update check.
+
+<p>
+  <img src="docs/bubble-green.jpg" width="260" alt="Floating bubble in its green all-clear state over the camera map">
+  <img src="docs/bubble-red.jpg" width="260" alt="Floating bubble turned red showing 249 m to the camera ahead">
+</p>
 
 ## How to install
 
@@ -99,9 +109,15 @@ riding and you're done.
 Open the gear icon (top right):
 
 - **Language** — Français / English / system default.
-- **Alert lead time** and **speed tolerance** — how many seconds before a
-  camera the voice fires, and how much over the limit is tolerated before
-  the "slow down" warning (+10 km/h matches Taiwan's enforcement margin).
+- **Alert distances** — how many metres before a camera the voice fires,
+  with separate sliders for below and above 100 km/h (city vs highway).
+- **Speed tolerance** — how much over the limit is tolerated before the
+  "slow down" warning (+10 km/h matches Taiwan's enforcement margin).
+- **Chime once the camera is passed** — optional all-clear tone when the
+  alerted camera falls behind you.
+- **Floating bubble over other apps** — the green/red countdown bubble shown
+  above; grant the "display over other apps" permission when the settings
+  row asks for it, then drag the bubble wherever you like.
 - **Stop detection after 10 min stationary** — optional auto-stop for
   forgetful riders; it announces itself before stopping.
 - **Start detection when Bluetooth connects** — optional auto-start when

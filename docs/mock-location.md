@@ -17,9 +17,11 @@ Test alert behaviour on a real phone without riding.
    realistic speed (≥ 40 km/h — below 15 km/h the bearing filter is
    deliberately disabled and behaviour differs).
 3. Start detection in TW SpeedTrap, then start the mock route.
-4. Expected: chime + one spoken alert entering the alert radius
-   (`max(200 m, speed × lead-time setting)`), no re-alert while inside, and
-   re-arm only after leaving 1.5× the radius.
+4. Expected: chime + one spoken alert entering the alert radius (the
+   below-100 km/h distance setting, 300 m by default; the above-100 km/h
+   distance on a mocked highway run), no re-alert while inside, re-arm only
+   after leaving 1.5× the radius, and — if enabled — the descending
+   all-clear chime once the camera falls behind.
 
 `adb logcat -s DetectionService` shows each alert with camera id and
 distance — this is the ground truth when the speaker is off.
@@ -31,4 +33,4 @@ adb emu geo fix <longitude> <latitude>   # note: longitude first
 ```
 
 Repeated fixes ~1 s apart simulate movement; emulated GPS reports speed 0,
-so the alert radius is the 200 m floor.
+so the alert radius is the below-100 km/h distance setting (300 m default).

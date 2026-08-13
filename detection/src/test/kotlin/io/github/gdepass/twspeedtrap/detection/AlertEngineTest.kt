@@ -38,7 +38,7 @@ class AlertEngineTest {
         val engine = AlertEngine(listOf(camera))
         // Heading south towards the camera from 400 m north of it.
         val events400 = engine.onFix(fix(camera.lat + 400 * degPerMeterLat))
-        assertTrue(events400.isEmpty(), "400 m at 60 km/h is outside the 200 m alert radius")
+        assertTrue(events400.isEmpty(), "400 m is outside the 300 m alert radius")
         val events150 = engine.onFix(fix(camera.lat + 150 * degPerMeterLat))
         assertEquals(1, events150.size)
         val events100 = engine.onFix(fix(camera.lat + 100 * degPerMeterLat))
@@ -49,20 +49,41 @@ class AlertEngineTest {
     fun `re-arms only after leaving hysteresis radius`() {
         val engine = AlertEngine(listOf(camera))
         assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
-        // Passing the camera and stopping just beyond alert distance: still disarmed.
-        assertTrue(engine.onFix(fix(camera.lat - 220 * degPerMeterLat)).isEmpty())
+        // Passing the camera (the all-clear fires) and stopping just beyond
+        // alert distance: still disarmed.
+        val passed = engine.onFix(fix(camera.lat - 220 * degPerMeterLat))
+        assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), passed)
         assertTrue(engine.onFix(fix(camera.lat - 150 * degPerMeterLat)).isEmpty())
-        // Beyond 1.5 × alert distance: re-arms, and a fresh approach fires again.
-        assertTrue(engine.onFix(fix(camera.lat - 400 * degPerMeterLat)).isEmpty())
+        // Beyond 1.5 × alert distance (450 m): re-arms, and a fresh approach fires again.
+        assertTrue(engine.onFix(fix(camera.lat - 500 * degPerMeterLat)).isEmpty())
         assertEquals(1, engine.onFix(fix(camera.lat - 150 * degPerMeterLat)).size)
     }
 
     @Test
-    fun `alert distance scales with speed`() {
+    fun `below 100 kmh the standard alert distance applies`() {
         val engine = AlertEngine(listOf(camera))
-        // 110 km/h → 30.6 m/s × 12 ≈ 367 m alert distance.
-        val events = engine.onFix(fix(camera.lat + 350 * degPerMeterLat, speedKmh = 110.0))
-        assertEquals(1, events.size)
+        // 90 km/h at 350 m: outside the 300 m standard radius; the 500 m
+        // high-speed radius only applies from 100 km/h.
+        assertTrue(engine.onFix(fix(camera.lat + 350 * degPerMeterLat, speedKmh = 90.0)).isEmpty())
+        assertEquals(1, engine.onFix(fix(camera.lat + 280 * degPerMeterLat, speedKmh = 90.0)).size)
+    }
+
+    @Test
+    fun `at highway speed the high-speed alert distance applies`() {
+        val engine = AlertEngine(listOf(camera))
+        // 110 km/h at 550 m: outside the 500 m high-speed radius.
+        assertTrue(engine.onFix(fix(camera.lat + 550 * degPerMeterLat, speedKmh = 110.0)).isEmpty())
+        assertEquals(1, engine.onFix(fix(camera.lat + 450 * degPerMeterLat, speedKmh = 110.0)).size)
+    }
+
+    @Test
+    fun `alert distances are adjustable per speed band`() {
+        val config = EngineConfig(alertDistanceM = 150.0, highSpeedAlertDistanceM = 600.0)
+        val slow = AlertEngine(listOf(camera), config)
+        assertTrue(slow.onFix(fix(camera.lat + 200 * degPerMeterLat)).isEmpty(), "200 m at 60 km/h: outside 150 m")
+        assertEquals(1, slow.onFix(fix(camera.lat + 140 * degPerMeterLat)).size)
+        val fast = AlertEngine(listOf(camera), config)
+        assertEquals(1, fast.onFix(fix(camera.lat + 550 * degPerMeterLat, speedKmh = 110.0)).size)
     }
 
     @Test
@@ -107,20 +128,76 @@ class AlertEngineTest {
     fun `re-arms even when the bearing no longer matches`() {
         val engine = AlertEngine(listOf(camera))
         assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
-        // Turn east and ride 400 m away: the bearing filter no longer matches,
+        // Turn east and ride 500 m away: the bearing filter no longer matches,
         // but the camera must still re-arm (it is beyond 1.5 × alert distance).
         val eastAway =
             Fix(
                 lat = camera.lat,
-                lon = camera.lon + 400 * degPerMeterLon,
+                lon = camera.lon + 500 * degPerMeterLon,
                 speedMps = 60 / 3.6,
                 bearingDeg = 90.0,
                 accuracyM = 5.0,
                 timestampMs = 0,
             )
-        assertTrue(engine.onFix(eastAway).isEmpty())
+        // Turning away emits the all-clear but must not re-fire the camera.
+        assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), engine.onFix(eastAway))
         // Looping the block and re-approaching southbound must fire again.
         assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size, "second approach must alert")
+    }
+
+    @Test
+    fun `all clear fires exactly once when the fired camera falls behind`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        val passed = engine.onFix(fix(camera.lat - 100 * degPerMeterLat))
+        assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), passed)
+        assertTrue(engine.onFix(fix(camera.lat - 200 * degPerMeterLat)).isEmpty(), "all clear must not repeat")
+    }
+
+    @Test
+    fun `no all clear while braking to a stop before the camera`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // Slowing below the bearing threshold while still approaching: GPS
+        // bearing is unreliable there, and the rider is NOT past the camera.
+        val braking = engine.onFix(fix(camera.lat + 50 * degPerMeterLat, speedKmh = 10.0, bearing = null))
+        assertTrue(braking.isEmpty(), "braking at the camera must not be declared clear")
+        assertTrue(engine.activeAlert != null, "alert stays active while stopped in front of the camera")
+    }
+
+    @Test
+    fun `all clear falls back to the distance margin when bearing is unknown`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // Bearing lost but clearly moving away: closest approach was 150 m,
+        // now 250 m — beyond the 75 m pass margin.
+        val events = engine.onFix(fix(camera.lat + 250 * degPerMeterLat, bearing = null))
+        assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), events)
+    }
+
+    @Test
+    fun `second alert takes over without an intermediate all clear`() {
+        val follower = camera.copy(id = "cam2", lat = camera.lat - 250 * degPerMeterLat)
+        val engine = AlertEngine(listOf(camera, follower))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // 10 m short of the first camera the follower enters its alert ring.
+        val handover = engine.onFix(fix(camera.lat + 10 * degPerMeterLat))
+        assertEquals(1, handover.size)
+        assertEquals("cam2", (handover.single() as AlertEvent.CameraAhead).camera.id)
+        // Passing the follower clears the ride in a single all-clear.
+        val passed = engine.onFix(fix(follower.lat - 100 * degPerMeterLat))
+        assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(follower)), passed)
+    }
+
+    @Test
+    fun `active alert exposes a live countdown until the pass`() {
+        val engine = AlertEngine(listOf(camera))
+        engine.onFix(fix(camera.lat + 150 * degPerMeterLat))
+        engine.onFix(fix(camera.lat + 80 * degPerMeterLat))
+        val active = engine.activeAlert
+        assertTrue(active != null && active.second in 70.0..90.0, "expected ~80 m to the fired camera, got $active")
+        engine.onFix(fix(camera.lat - 100 * degPerMeterLat))
+        assertTrue(engine.activeAlert == null, "a passed camera is no longer an active alert")
     }
 
     @Test

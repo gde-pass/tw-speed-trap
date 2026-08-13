@@ -1,14 +1,14 @@
 package io.github.gdepass.twspeedtrap.detection
 
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 data class EngineConfig(
-    /** Alert distance = max(minAlertDistanceM, speed_m/s × distanceMultiplier). */
-    val distanceMultiplier: Double = 12.0,
-    val minAlertDistanceM: Double = 200.0,
+    /** Alerts fire this many metres before the camera below [AlertEngine.HIGH_SPEED_THRESHOLD_KMH]. */
+    val alertDistanceM: Double = 300.0,
+    /** Alerts fire this many metres before the camera at highway speed. */
+    val highSpeedAlertDistanceM: Double = 500.0,
     val bearingToleranceDeg: Double = 45.0,
     /** Below this speed GPS bearing is noise; skip the bearing filter. */
     val minSpeedForBearingMps: Double = 15.0 / 3.6,
@@ -37,9 +37,20 @@ class AlertEngine(
     var nearestCamera: Pair<Camera, Double>? = null
         private set
 
+    /** The camera whose alert fired and is still ahead, with its current distance. */
+    var activeAlert: Pair<Camera, Double>? = null
+        private set
+
+    private var activeMinDistanceM = 0.0
+
     fun onFix(fix: Fix): List<AlertEvent> {
         val events = ArrayList<AlertEvent>(1)
-        val alertDistance = max(config.minAlertDistanceM, fix.speedMps * config.distanceMultiplier)
+        val alertDistance =
+            if (fix.speedMps * 3.6 >= HIGH_SPEED_THRESHOLD_KMH) {
+                config.highSpeedAlertDistanceM
+            } else {
+                config.alertDistanceM
+            }
         var nearest: Pair<Camera, Double>? = null
 
         for (camera in index.near(fix.lat, fix.lon)) {
@@ -47,8 +58,35 @@ class AlertEngine(
             if (nearest == null || distance < nearest.second) nearest = camera to distance
         }
         nearestCamera = nearest
+        trackActiveAlert(fix, events)
         if (sectionsEnabled) events.addAll(sectionTracker.onFix(fix))
         return events
+    }
+
+    /** Keeps [activeAlert] on the last fired camera and emits [AlertEvent.AllClear]
+     * once it is passed. A newer alert takes over silently: the rider is not
+     * "clear" while another camera is ahead. */
+    private fun trackActiveAlert(
+        fix: Fix,
+        events: MutableList<AlertEvent>,
+    ) {
+        val fired = events.lastOrNull { it is AlertEvent.CameraAhead } as? AlertEvent.CameraAhead
+        if (fired != null) {
+            activeAlert = fired.camera to fired.distanceM
+            activeMinDistanceM = fired.distanceM
+            return
+        }
+        val (camera, _) = activeAlert ?: return
+        val distance = GeoMath.distanceMeters(fix.lat, fix.lon, camera.lat, camera.lon)
+        activeMinDistanceM = min(activeMinDistanceM, distance)
+        // Behind by bearing is the prompt signal; the distance margin covers a
+        // rider who turns off the road (or whose GPS bearing is unreliable).
+        if (isBehind(fix, camera) || distance > activeMinDistanceM + PASS_CLEAR_MARGIN_M) {
+            activeAlert = null
+            events.add(AlertEvent.AllClear(camera))
+        } else {
+            activeAlert = camera to distance
+        }
     }
 
     /** Returns the distance when the camera is relevant to this fix, else null. */
@@ -90,6 +128,19 @@ class AlertEngine(
         return angularDifference(travel, toCamera) <= AHEAD_HALF_PLANE_DEG
     }
 
+    /** Not the negation of [isAhead]: without a trustworthy bearing (slow or
+     * missing) the position is unknown, and a rider braking to a stop at the
+     * camera must not be declared clear. */
+    private fun isBehind(
+        fix: Fix,
+        camera: Camera,
+    ): Boolean {
+        if (fix.speedMps < config.minSpeedForBearingMps) return false
+        val travel = fix.bearingDeg ?: return false
+        val toCamera = GeoMath.bearingDegrees(fix.lat, fix.lon, camera.lat, camera.lon)
+        return angularDifference(travel, toCamera) > AHEAD_HALF_PLANE_DEG
+    }
+
     private fun bearingMatches(
         fix: Fix,
         camera: Camera,
@@ -101,8 +152,14 @@ class AlertEngine(
     }
 
     companion object {
+        /** At or above this speed the high-speed alert distance applies. */
+        const val HIGH_SPEED_THRESHOLD_KMH = 100.0
+
         /** A passed camera counts as "ahead" while within this angle of the travel bearing. */
         const val AHEAD_HALF_PLANE_DEG = 90.0
+
+        /** Fallback pass detection: clear once this much farther than the closest approach. */
+        const val PASS_CLEAR_MARGIN_M = 75.0
 
         fun angularDifference(
             a: Double,

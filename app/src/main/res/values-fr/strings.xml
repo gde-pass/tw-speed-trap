@@ -64,7 +64,12 @@
     <string name="settings_alerts">Alertes</string>
     <string name="settings_applies_next_start">Détection en cours — les changements s’appliqueront au prochain démarrage.</string>
     <string name="settings_chime">Carillon avant les annonces</string>
-    <string name="settings_lead_time">Préavis d’alerte : %1$d s avant le radar</string>
+    <string name="settings_all_clear_chime">Carillon une fois le radar passé</string>
+    <string name="settings_overlay_bubble">Bulle flottante par-dessus les autres applis</string>
+    <string name="settings_overlay_permission_missing">Permission « Afficher par-dessus les autres applis » manquante — la bulle ne peut pas s’afficher.</string>
+    <string name="settings_overlay_permission_grant">Autoriser l’affichage par-dessus</string>
+    <string name="settings_alert_distance">Distance d’alerte sous 100 km/h : %1$d m</string>
+    <string name="settings_alert_distance_high">Distance d’alerte au-delà de 100 km/h : %1$d m</string>
     <string name="settings_tolerance">Tolérance de vitesse : +%1$d km/h</string>
     <string name="settings_auto_stop">Arrêter la détection après 10 min à l’arrêt</string>
     <string name="settings_auto_start_bt">Démarrer la détection à la connexion Bluetooth</string>
