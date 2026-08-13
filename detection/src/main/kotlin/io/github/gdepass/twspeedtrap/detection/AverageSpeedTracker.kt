@@ -72,6 +72,12 @@ class AverageSpeedTracker(
     /** True while a section traversal is in progress. */
     val isActive: Boolean get() = active != null
 
+    /** Live view of the traversal for the UI: (section, projected exit average
+     * km/h). Frozen at the last good value while stopped — a projection
+     * through zero speed is meaningless. Null outside sections. */
+    var liveStatus: Pair<Section, Int>? = null
+        private set
+
     fun onFix(fix: Fix): List<AlertEvent> {
         updateBearingMemory(fix)
         val current = active
@@ -80,11 +86,31 @@ class AverageSpeedTracker(
         // (e.g. 觀音隧道 exit → 谷風 entry, 78 m apart) share bridge fixes.
         val entryEvents = if (active == null) checkEntry(fix) else emptyList()
         if (fix.accuracyM <= ACCURACY_GATE_M) lastGeometricFixMs = fix.timestampMs
+        updateLiveStatus(fix)
         return when {
             entryEvents.isEmpty() -> progressEvents
             progressEvents.isEmpty() -> entryEvents
             else -> progressEvents + entryEvents
         }
+    }
+
+    private fun updateLiveStatus(fix: Fix) {
+        val traversal = active
+        if (traversal == null) {
+            liveStatus = null
+            return
+        }
+        val elapsedS = (fix.timestampMs - traversal.entryTimeMs) / 1000.0
+        if (fix.speedMps <= 1.0 || elapsedS <= 0.0 || fix.accuracyM > ACCURACY_GATE_M) {
+            // Stopped or untrusted fix: freeze; before any projection exists,
+            // "riding at the limit" is the only honest placeholder.
+            if (liveStatus == null) liveStatus = traversal.section to traversal.section.speedLimitKmh
+            return
+        }
+        val remainingM = GeoMath.distanceMeters(fix.lat, fix.lon, traversal.exit.lat, traversal.exit.lon)
+        val projectedKmh =
+            (traversal.section.lengthM / (elapsedS + remainingM / fix.speedMps) * MPS_TO_KMH).roundToInt()
+        liveStatus = traversal.section to projectedKmh
     }
 
     private fun updateBearingMemory(fix: Fix) {

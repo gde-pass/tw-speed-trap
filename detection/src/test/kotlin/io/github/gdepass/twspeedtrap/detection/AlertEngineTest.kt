@@ -22,12 +22,13 @@ class AlertEngineTest {
         lat: Double,
         speedKmh: Double = 60.0,
         bearing: Double? = 180.0,
+        accuracy: Double = 5.0,
     ) = Fix(
         lat = lat,
         lon = 120.65000,
         speedMps = speedKmh / 3.6,
         bearingDeg = bearing,
-        accuracyM = 5.0,
+        accuracyM = accuracy,
         timestampMs = 0L,
     )
 
@@ -143,6 +144,46 @@ class AlertEngineTest {
         assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), engine.onFix(eastAway))
         // Looping the block and re-approaching southbound must fire again.
         assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size, "second approach must alert")
+    }
+
+    @Test
+    fun `exactly 100 kmh uses the high-speed distance`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 450 * degPerMeterLat, speedKmh = 100.0)).size)
+    }
+
+    @Test
+    fun `braking through 100 kmh must not re-alert the same approach`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 480 * degPerMeterLat, speedKmh = 105.0)).size)
+        // Braking (the designed reaction) drops the band, but re-arm distance
+        // must come from the ring that fired, not from the new speed.
+        assertTrue(engine.onFix(fix(camera.lat + 460 * degPerMeterLat, speedKmh = 95.0)).isEmpty())
+        assertTrue(engine.onFix(fix(camera.lat + 300 * degPerMeterLat, speedKmh = 80.0)).isEmpty())
+    }
+
+    @Test
+    fun `a noisy fix cannot fake the all clear`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // Multipath jump: reported position far past the margin, but the fix
+        // says not to trust it. The camera must stay pending.
+        val noisy = engine.onFix(fix(camera.lat + 300 * degPerMeterLat, bearing = null, accuracy = 300.0))
+        assertTrue(noisy.isEmpty(), "bad accuracy must not fake a pass")
+        assertTrue(engine.activeAlert != null, "alert stays active through the noise")
+    }
+
+    @Test
+    fun `a noisy close fix must not ratchet the closest approach`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // Garbage fix apparently 60 m from the camera: must not become the
+        // recorded closest approach.
+        assertTrue(engine.onFix(fix(camera.lat + 60 * degPerMeterLat, accuracy = 300.0)).isEmpty())
+        // Honest fix at 200 m: within margin of the true minimum (150 m), so
+        // still pending. A ratcheted 60 m minimum would clear here falsely.
+        assertTrue(engine.onFix(fix(camera.lat + 200 * degPerMeterLat, bearing = null)).isEmpty())
+        assertTrue(engine.activeAlert != null)
     }
 
     @Test

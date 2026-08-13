@@ -3,6 +3,7 @@ package io.github.gdepass.twspeedtrap
 import android.app.Application
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.data.UpdateWorker
+import io.github.gdepass.twspeedtrap.service.BubbleOverlayController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,6 +15,7 @@ class TwSpeedTrapApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        BubbleOverlayController.init(this)
         appScope.launch {
             val settings = SettingsRepository(this@TwSpeedTrapApp).settings.first()
             UpdateWorker.schedule(this@TwSpeedTrapApp, settings.autoUpdateEnabled, settings.wifiOnlyUpdates)

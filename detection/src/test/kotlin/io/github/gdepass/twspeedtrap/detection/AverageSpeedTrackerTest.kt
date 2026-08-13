@@ -81,6 +81,32 @@ class AverageSpeedTrackerTest {
     private fun replay(fixes: List<Fix>): List<AlertEvent> = fixes.flatMap(tracker()::onFix)
 
     @Test
+    fun `live status projects the exit average while inside the section`() {
+        val t = tracker()
+        drive(speedKmh = 80.0, until = 1000.0).forEach(t::onFix)
+        val live = t.liveStatus
+        assertTrue(live != null && live.second in 77..83, "constant 80 km/h must project ~80, got $live")
+        assertEquals("test", live?.first?.id)
+    }
+
+    @Test
+    fun `live status freezes while stopped inside the section`() {
+        val t = tracker()
+        drive(speedKmh = 60.0, until = 500.0).forEach(t::onFix)
+        val before = t.liveStatus
+        assertTrue(before != null, "half-way through the section the status must be live")
+        t.onFix(northboundFix(500.0, 0.0, 60_000L))
+        assertEquals(before, t.liveStatus, "zero speed must freeze the projection, not distort it")
+    }
+
+    @Test
+    fun `live status clears once the section is exited`() {
+        val t = tracker()
+        drive(speedKmh = 55.0).forEach(t::onFix)
+        assertTrue(t.liveStatus == null, "no live status outside a traversal")
+    }
+
+    @Test
     fun `legal traversal announces entry and exit without warnings`() {
         val events = replay(drive(speedKmh = 55.0))
         assertEquals(2, events.size, "expected entry + exit only, got $events")

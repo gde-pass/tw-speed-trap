@@ -11,7 +11,6 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.SystemClock
-import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -20,7 +19,6 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import io.github.gdepass.twspeedtrap.MainActivity
 import io.github.gdepass.twspeedtrap.R
-import io.github.gdepass.twspeedtrap.data.AppSettings
 import io.github.gdepass.twspeedtrap.data.CameraRepository
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.detection.AlertEngine
@@ -42,7 +40,6 @@ class DetectionService : LifecycleService() {
     private var announcer: Announcer? = null
     private var chimeEnabled = true
     private var allClearChimeEnabled = false
-    private var overlayBubble: OverlayBubble? = null
     private lateinit var localized: Context
     private var locationMonitor: BroadcastReceiver? = null
     private var lastNotificationText: String? = null
@@ -120,11 +117,9 @@ class DetectionService : LifecycleService() {
     }
 
     private suspend fun runDetection() {
-        val settingsRepository = SettingsRepository(applicationContext)
-        val settings = settingsRepository.settings.first()
+        val settings = SettingsRepository(applicationContext).settings.first()
         chimeEnabled = settings.chimeEnabled
         allClearChimeEnabled = settings.allClearChimeEnabled
-        showOverlayBubble(settings, settingsRepository)
         // Spoken alerts and notification text follow the app language.
         localized = LocaleOverride.wrap(this@DetectionService, settings.languageTag)
         announcer =
@@ -152,8 +147,15 @@ class DetectionService : LifecycleService() {
                 return@collect
             }
             engine.onFix(fix).forEach(::announce)
-            overlayBubble?.setDistance(engine.activeAlert?.second?.roundToInt())
             val nearest = engine.nearestCamera
+            val alert =
+                engine.activeAlert?.let { (camera, distance) ->
+                    DetectionStatus.ActiveAlert(camera.type, camera.speedLimitKmh, distance.roundToInt())
+                }
+            val section =
+                engine.activeSection?.let { (sec, projected) ->
+                    DetectionStatus.ActiveSection(sec.speedLimitKmh, projected)
+                }
             val speedKmh = (fix.speedMps * 3.6).roundToInt()
             DetectionStatus.update {
                 it.copy(
@@ -161,6 +163,8 @@ class DetectionService : LifecycleService() {
                     accuracyM = fix.accuracyM.roundToInt(),
                     nextCameraDistanceM = nearest?.second?.roundToInt(),
                     nextCameraLimitKmh = nearest?.first?.speedLimitKmh,
+                    activeAlert = alert,
+                    activeSection = section,
                 )
             }
             val rendered =
@@ -172,24 +176,6 @@ class DetectionService : LifecycleService() {
                 updateNotification(rendered.speedKmh, rendered.distanceBucketM)
             }
         }
-    }
-
-    /** The bubble needs the display-over-other-apps permission; without it the
-     * toggle stays a silent no-op rather than crashing the service. */
-    private fun showOverlayBubble(
-        settings: AppSettings,
-        repository: SettingsRepository,
-    ) {
-        if (!settings.overlayBubbleEnabled || !Settings.canDrawOverlays(this) || overlayBubble != null) return
-        overlayBubble =
-            OverlayBubble(this, settings.overlayX, settings.overlayY) { x, y ->
-                lifecycleScope.launch { repository.setOverlayPosition(x, y) }
-            }.also { it.attach() }
-    }
-
-    private fun removeOverlayBubble() {
-        overlayBubble?.detach()
-        overlayBubble = null
     }
 
     /** Detection died (revoked permission, corrupt database, …): the rider
@@ -267,7 +253,6 @@ class DetectionService : LifecycleService() {
         lastNotificationText = null
         locationMonitor?.let(::unregisterReceiver)
         locationMonitor = null
-        removeOverlayBubble()
         announcer?.release()
         announcer = null
         DetectionStatus.reset()
@@ -279,7 +264,6 @@ class DetectionService : LifecycleService() {
         detectionJob?.cancel()
         locationMonitor?.let(::unregisterReceiver)
         locationMonitor = null
-        removeOverlayBubble()
         announcer?.release()
         DetectionStatus.reset()
         super.onDestroy()

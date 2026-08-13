@@ -17,9 +17,9 @@ not published on Google Play.
 - Direction-aware (skips cameras facing the other way), adjustable alert
   distances for city and highway speeds, +10 km/h tolerance (Taiwan's
   enforcement margin) — all configurable.
-- **Floating bubble** over Google Maps (optional): a draggable circle that
-  stays green while the road is clear and turns red with a live metre
-  countdown when a camera is ahead — glanceable without leaving navigation.
+- **Floating bubble** over Google Maps (optional): a draggable overlay that
+  doubles as a start/stop button and expands into a camera-type card when an
+  alert fires — glanceable without leaving navigation (see below).
 - Optional **all-clear chime** once the camera is behind you — a distinct
   descending tone, so your ears know the difference from the alert chime.
 - Average-speed sections (區間測速): entry/exit announcements and a
@@ -27,9 +27,34 @@ not published on Google Play.
 - No ads, no analytics, no account. Location never leaves the phone; the
   only network traffic is the database update check.
 
+## The floating bubble
+
+An optional overlay (Settings → *Floating bubble over other apps*) that
+floats above whatever is in front — Google Maps, typically. Drag it wherever
+you like; the position is remembered. It is visible whenever the app is
+alive, even with detection stopped, and **tapping it starts or stops
+detection** without opening the app.
+
+| State | Meaning |
+| --- | --- |
+| **Grey circle, play glyph** | Detection is off. Tap to start it (tap again anytime to stop). |
+| **Amber circle, !** | Detection is running but blind: location services are off, or no GPS fix has arrived yet. Never trust a ride to an amber bubble. |
+| **Green circle** | Detection running, GPS locked, nothing ahead — all clear. |
+| **Red card** | A camera alert is active: a glyph shows the camera type (camera = fixed, tripod = mobile, traffic light = red-light, eye = tech/behaviour), the white pill its speed limit when known, and the metres count down live until the camera is behind you. |
+| **Purple card** | Average-speed section in progress: the pill shows the section limit, the number is your **projected exit average** — keep it under the pill and the exit announcement stays polite. |
+
 <p>
-  <img src="docs/bubble-green.jpg" width="260" alt="Floating bubble in its green all-clear state over the camera map">
-  <img src="docs/bubble-red.jpg" width="260" alt="Floating bubble turned red showing 249 m to the camera ahead">
+  <img src="docs/bubble-idle.jpg" width="180" alt="Grey idle bubble with a play glyph: detection off, tap to start">
+  <img src="docs/bubble-nogps.jpg" width="180" alt="Amber bubble with an exclamation mark: detection running but blind, no GPS">
+  <img src="docs/bubble-green.jpg" width="180" alt="Green bubble: detection running, all clear">
+</p>
+<p>
+  <img src="docs/bubble-red.jpg" width="180" alt="Red card with camera glyph, limit 50 pill and 249 m countdown for a fixed camera">
+  <img src="docs/bubble-redlight.jpg" width="180" alt="Red card with a traffic-light glyph and 47 m countdown for a red-light camera">
+  <img src="docs/bubble-tech.jpg" width="180" alt="Red card with an eye glyph and 250 m countdown for a tech-enforcement camera">
+</p>
+<p>
+  <img src="docs/bubble-section.jpg" width="180" alt="Purple card with the section limit 70 pill and the projected exit average">
 </p>
 
 ## How to install
@@ -115,9 +140,11 @@ Open the gear icon (top right):
   "slow down" warning (+10 km/h matches Taiwan's enforcement margin).
 - **Chime once the camera is passed** — optional all-clear tone when the
   alerted camera falls behind you.
-- **Floating bubble over other apps** — the green/red countdown bubble shown
-  above; grant the "display over other apps" permission when the settings
-  row asks for it, then drag the bubble wherever you like.
+- **Floating bubble over other apps** — the status overlay described in
+  [The floating bubble](#the-floating-bubble); grant the "display over other
+  apps" permission when the settings row asks for it. It appears as soon as
+  the toggle is on and works as a tap-to-start/stop control even while
+  detection is off.
 - **Stop detection after 10 min stationary** — optional auto-stop for
   forgetful riders; it announces itself before stopping.
 - **Start detection when Bluetooth connects** — optional auto-start when

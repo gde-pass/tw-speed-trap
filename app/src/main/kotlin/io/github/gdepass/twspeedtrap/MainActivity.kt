@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
+import io.github.gdepass.twspeedtrap.service.BubbleOverlayController
 import io.github.gdepass.twspeedtrap.ui.AboutScreen
 import io.github.gdepass.twspeedtrap.ui.MainScreen
 import io.github.gdepass.twspeedtrap.ui.MapScreen
@@ -23,6 +24,13 @@ class MainActivity : ComponentActivity() {
         // Apply the app-language override before any resources are resolved.
         val tag = runBlocking { SettingsRepository(newBase).settings.first().languageTag }
         super.attachBaseContext(LocaleOverride.wrap(newBase, tag))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The user may have just granted the overlay permission in system
+        // settings; the settings flow alone would not re-emit for that.
+        BubbleOverlayController.refresh()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

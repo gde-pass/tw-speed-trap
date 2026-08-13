@@ -105,7 +105,9 @@ class Announcer(
         tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
     }
 
-    /** Descending two-tone earcon, no speech: the alerted camera is behind. */
+    /** Descending two-tone earcon, no speech: the alerted camera is behind.
+     * Deliberately dropped (not queued) while TTS is still binding — an
+     * all-clear is only true at the moment it happens. */
     fun playAllClear() {
         if (!ready) return
         audioManager.requestAudioFocus(focusRequest)
