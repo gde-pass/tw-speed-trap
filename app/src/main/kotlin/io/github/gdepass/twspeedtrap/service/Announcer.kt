@@ -4,8 +4,11 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import io.github.gdepass.twspeedtrap.R
 import java.util.Locale
 
@@ -40,10 +43,20 @@ class Announcer(
     private var pending: Pair<String, Boolean>? = null
     private var utteranceSeq = 0
 
-    /** Focus is released when the *last queued* utterance finishes, so a chime
-     * followed by speech holds focus across both. */
-    @Volatile
-    private var lastUtteranceId: String? = null
+    private val handler = Handler(Looper.getMainLooper())
+
+    private val ledger =
+        FocusLedger(
+            requestFocus = { audioManager.requestAudioFocus(focusRequest) },
+            abandonFocus = { audioManager.abandonAudioFocusRequest(focusRequest) },
+        )
+
+    /** Backstop for a TTS engine that dies mid-utterance and never calls back. */
+    private val watchdog =
+        Runnable {
+            Log.w(TAG, "utterance callbacks never arrived — force-releasing audio focus")
+            ledger.forceRelease()
+        }
 
     /** True when the requested locale has no installed voice (surfaced in M4 UX). */
     var voiceMissing = false
@@ -72,14 +85,20 @@ class Announcer(
             object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) = Unit
 
-                override fun onDone(utteranceId: String?) {
-                    if (utteranceId == lastUtteranceId) audioManager.abandonAudioFocusRequest(focusRequest)
-                }
+                override fun onDone(utteranceId: String?) = ledger.complete(utteranceId)
+
+                override fun onStop(
+                    utteranceId: String?,
+                    interrupted: Boolean,
+                ) = ledger.complete(utteranceId)
+
+                override fun onError(
+                    utteranceId: String?,
+                    errorCode: Int,
+                ) = ledger.complete(utteranceId)
 
                 @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) {
-                    if (utteranceId == lastUtteranceId) audioManager.abandonAudioFocusRequest(focusRequest)
-                }
+                override fun onError(utteranceId: String?) = ledger.complete(utteranceId)
             },
         )
         ready = true
@@ -96,13 +115,24 @@ class Announcer(
             pending = text to chime
             return
         }
-        audioManager.requestAudioFocus(focusRequest)
-        if (chime) {
-            tts.playEarcon(EARCON_CHIME, TextToSpeech.QUEUE_ADD, null, "twsp-${utteranceSeq++}")
-        }
-        val utteranceId = "twsp-${utteranceSeq++}"
-        lastUtteranceId = utteranceId
-        tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        // The ledger ignores requestAudioFocus's result on purpose: safety
+        // alerts must speak even when focus is denied (e.g. during a call),
+        // and abandoning a never-granted request is harmless.
+        val enqueued =
+            ledger.announce {
+                buildList {
+                    if (chime) {
+                        val chimeId = "twsp-${utteranceSeq++}"
+                        val result = tts.playEarcon(EARCON_CHIME, TextToSpeech.QUEUE_ADD, null, chimeId)
+                        if (result == TextToSpeech.SUCCESS) add(chimeId)
+                    }
+                    val utteranceId = "twsp-${utteranceSeq++}"
+                    if (tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId) == TextToSpeech.SUCCESS) {
+                        add(utteranceId)
+                    }
+                }
+            }
+        if (enqueued) armWatchdog()
     }
 
     /** Descending two-tone earcon, no speech: the alerted camera is behind.
@@ -110,20 +140,36 @@ class Announcer(
      * all-clear is only true at the moment it happens. */
     fun playAllClear() {
         if (!ready) return
-        audioManager.requestAudioFocus(focusRequest)
-        val utteranceId = "twsp-${utteranceSeq++}"
-        lastUtteranceId = utteranceId
-        tts.playEarcon(EARCON_ALL_CLEAR, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        val enqueued =
+            ledger.announce {
+                val utteranceId = "twsp-${utteranceSeq++}"
+                when (tts.playEarcon(EARCON_ALL_CLEAR, TextToSpeech.QUEUE_ADD, null, utteranceId)) {
+                    TextToSpeech.SUCCESS -> listOf(utteranceId)
+                    else -> emptyList()
+                }
+            }
+        if (enqueued) armWatchdog()
+    }
+
+    /** One pending watchdog at a time, re-armed on every successful enqueue,
+     * so back-to-back alerts keep pushing the deadline out. A fire after the
+     * queue drained normally is a no-op. */
+    private fun armWatchdog() {
+        handler.removeCallbacks(watchdog)
+        handler.postDelayed(watchdog, WATCHDOG_MS)
     }
 
     fun release() {
+        handler.removeCallbacks(watchdog)
         tts.stop()
         tts.shutdown()
-        audioManager.abandonAudioFocusRequest(focusRequest)
+        ledger.forceRelease()
     }
 
     companion object {
+        private const val TAG = "Announcer"
         private const val EARCON_CHIME = "[twsp_chime]"
         private const val EARCON_ALL_CLEAR = "[twsp_all_clear]"
+        private const val WATCHDOG_MS = 30_000L
     }
 }
