@@ -27,6 +27,7 @@
 - detection/ is pure JVM and GPX-replay-deterministic: fix timestamps only — no wall clocks, no randomness
 - Null camera bearing = alert both directions (fail-safe); dedupe/merges must never narrow a null bearing
 - Missing source columns raise SchemaError; unresolved/suppressed rows are always counted, never silent
+- The overlay bubble must come down when the app's last activity is destroyed: an overlay window pins the process at perceptible oom_adj (200), so a bubble that outlives its app is never reclaimed and only the settings toggle can kill it
 - Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + watchdog) — never a single last-utterance-id gate
 
 ## Tooling quirks

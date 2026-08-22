@@ -21,26 +21,32 @@ import kotlinx.coroutines.launch
 /**
  * Owns the floating bubble for the whole process, not just while detection
  * runs: with the setting on and the overlay permission granted, the bubble is
- * up whenever the user has opened the app this process (or detection is
- * running) — grey (tap to start) while detection is off, live states from
- * [DetectionStatus] while it runs. Background process starts (update worker,
- * Bluetooth receiver) alone never summon it. Tapping toggles the
+ * up for as long as the app is open — including while it sits behind Google
+ * Maps — and for as long as detection runs, grey (tap to start) while
+ * detection is off, live states from [DetectionStatus] while it runs.
+ * Background process starts (update worker, Bluetooth receiver) alone never
+ * summon it, and closing the app puts it away again. Tapping toggles the
  * [DetectionService]; dragging persists the position.
  */
 object BubbleOverlayController {
     private var bubble: OverlayBubble? = null
     private val permissionRecheck = MutableStateFlow(0)
 
-    /** True once any activity started in this process: the gate that keeps
-     * background-only process resurrections from surprising the user. */
-    private val userAware = MutableStateFlow(false)
+    /** True while the app has a live activity: open, or backgrounded with its
+     * task intact. Two things hang on it — a background-only process
+     * resurrection never summons the bubble, and closing the app takes an idle
+     * bubble down. The second has no other rescue: an overlay window holds the
+     * process at perceptible priority, so it is never reclaimed, and a bubble
+     * that outlives the app that owns it outlives it for good. */
+    private val userPresent = MutableStateFlow(false)
+    private val presence = ActivityPresence()
     private var started = false
 
     /** Idempotent; call once from [android.app.Application.onCreate]. */
     fun init(app: Application) {
         if (started) return
         started = true
-        app.registerActivityLifecycleCallbacks(UserAwareness)
+        app.registerActivityLifecycleCallbacks(UserPresence)
         // Main.immediate: every bubble mutation is a WindowManager call.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val repository = SettingsRepository(app)
@@ -49,10 +55,10 @@ object BubbleOverlayController {
                 repository.settings,
                 DetectionStatus.state,
                 permissionRecheck,
-                userAware,
-            ) { settings, status, _, aware ->
-                Triple(settings, status, aware)
-            }.collect { (settings, status, aware) -> apply(app, scope, repository, settings, status, aware) }
+                userPresent,
+            ) { settings, status, _, present ->
+                Triple(settings, status, present)
+            }.collect { (settings, status, present) -> apply(app, scope, repository, settings, status, present) }
         }
     }
 
@@ -61,18 +67,32 @@ object BubbleOverlayController {
         permissionRecheck.value++
     }
 
+    /** The bubble floats over every other app, so it must never be a window
+     * the user cannot put away: with detection off it lives exactly as long as
+     * the app does, and while detection runs the bubble itself is the off
+     * switch. */
+    internal fun shouldShow(
+        enabled: Boolean,
+        present: Boolean,
+        running: Boolean,
+        canDrawOverlays: Boolean,
+    ): Boolean = enabled && (present || running) && canDrawOverlays
+
     private fun apply(
         app: Application,
         scope: CoroutineScope,
         repository: SettingsRepository,
         settings: AppSettings,
         status: DetectionStatus.UiState,
-        aware: Boolean,
+        present: Boolean,
     ) {
         val show =
-            settings.overlayBubbleEnabled &&
-                (aware || status.running) &&
-                Settings.canDrawOverlays(app)
+            shouldShow(
+                settings.overlayBubbleEnabled,
+                present,
+                status.running,
+                Settings.canDrawOverlays(app),
+            )
         if (!show) {
             bubble?.detach()
             bubble = null
@@ -156,15 +176,19 @@ object BubbleOverlayController {
         }
     }
 
-    private object UserAwareness : Application.ActivityLifecycleCallbacks {
-        override fun onActivityStarted(activity: Activity) {
-            userAware.value = true
-        }
-
+    private object UserPresence : Application.ActivityLifecycleCallbacks {
         override fun onActivityCreated(
             activity: Activity,
             savedInstanceState: Bundle?,
-        ) = Unit
+        ) {
+            userPresent.value = presence.onCreated()
+        }
+
+        override fun onActivityDestroyed(activity: Activity) {
+            userPresent.value = presence.onDestroyed(activity.isChangingConfigurations)
+        }
+
+        override fun onActivityStarted(activity: Activity) = Unit
 
         override fun onActivityResumed(activity: Activity) = Unit
 
@@ -176,8 +200,6 @@ object BubbleOverlayController {
             activity: Activity,
             outState: Bundle,
         ) = Unit
-
-        override fun onActivityDestroyed(activity: Activity) = Unit
     }
 
     private const val TAG = "BubbleOverlay"

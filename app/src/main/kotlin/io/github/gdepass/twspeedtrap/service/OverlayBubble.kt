@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.RectF
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -139,8 +140,16 @@ class OverlayBubble(
 
     fun detach() {
         if (!attached) return
-        windowManager.removeView(this)
         attached = false
+        try {
+            windowManager.removeView(this)
+        } catch (e: IllegalArgumentException) {
+            // The system already took the window down (the overlay permission
+            // was revoked while it was up). Nothing left to remove, and
+            // letting this out would kill the controller's collector — the
+            // bubble would then be unremovable even from the settings toggle.
+            Log.w(TAG, "overlay already removed", e)
+        }
     }
 
     fun render(newState: BubbleState) {
@@ -368,6 +377,7 @@ class OverlayBubble(
     }
 
     companion object {
+        private const val TAG = "OverlayBubble"
         private const val CARD_WIDTH_DP = 124f
         private const val CARD_HEIGHT_DP = 92f
         private const val QUIET_SIZE_DP = 72f

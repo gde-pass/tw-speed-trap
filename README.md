@@ -31,9 +31,11 @@ not published on Google Play.
 
 An optional overlay (Settings → *Floating bubble over other apps*) that
 floats above whatever is in front — Google Maps, typically. Drag it wherever
-you like; the position is remembered. It is visible whenever the app is
-alive, even with detection stopped, and **tapping it starts or stops
-detection** without opening the app.
+you like; the position is remembered. It is visible whenever the app is open
+— including while it sits in the background behind Maps — and whenever
+detection is running, so **tapping it starts or stops detection** without
+opening the app. Close the app and an idle bubble goes with it; a bubble left
+over a running detection goes when you stop detection.
 
 | State | Meaning |
 | --- | --- |
@@ -144,7 +146,7 @@ Open the gear icon (top right):
   [The floating bubble](#the-floating-bubble); grant the "display over other
   apps" permission when the settings row asks for it. It appears as soon as
   the toggle is on and works as a tap-to-start/stop control even while
-  detection is off.
+  detection is off; closing the app takes it down again.
 - **Stop detection after 10 min stationary** — optional auto-stop for
   forgetful riders; it announces itself before stopping.
 - **Start detection when Bluetooth connects** — optional auto-start when
