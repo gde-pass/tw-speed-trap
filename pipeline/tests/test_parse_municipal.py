@@ -22,6 +22,10 @@ from twsp_pipeline.parse import (
     parse_178086,
     parse_178159,
     parse_25935,
+    parse_178168,
+    parse_172174,
+    parse_178144,
+    parse_159972,
 )
 
 # Header carries a DOUBLE BOM; 經度 holds latitude (~24.x) and 緯度 longitude;
@@ -191,6 +195,10 @@ def test_municipal_missing_columns_fail_loudly():
         parse_176560,
         parse_176561,
         parse_177827,
+        parse_178168,
+        parse_172174,
+        parse_178144,
+        parse_159972,
     )
     for parse in parsers:
         with pytest.raises(SchemaError):
@@ -274,3 +282,90 @@ def test_county_missing_columns_fail_loudly():
     for parse in (parse_172905, parse_178159, parse_156415, parse_172940, parse_178085, parse_178086):
         with pytest.raises(SchemaError):
             parse("foo,bar\n1,2\n", "2026-08-11")
+
+
+# Taoyuan: county-standard columns, underscore-suffixed location, 速限 '-' and
+# 拍攝方向 雙向 on most rows.
+CSV_178168 = """設備編號,型式,縣市,行政區,科技執法種類,取締項目,設置區域描述,設置地點_路口或路段,座標緯度,座標經度,拍攝方向,速限,管轄單位,備註
+1,科技執法設備,桃園市,桃園區,租賃式多功能科技執法,闖紅燈、未依標誌標線號誌行駛,,三民路一段與自強路口,25.001185,121.317046,雙向,-,桃園分局,
+57,科技執法設備,桃園市,蘆竹區,路口多功能測速執法,超速、闖紅燈、未依標誌標線號誌行駛,,蘆竹區濱海路一段與海湖北路,25.11712,121.26382,雙向,70,蘆竹分局,
+3,科技執法設備,桃園市,桃園區,租賃式多功能科技執法,未停讓行人,,三民路三段與中正路口,24.998759,121.308498,雙向,-,桃園分局,
+7,科技執法設備,桃園市,桃園區,路口多功能測速執法,超速、闖紅燈、未依標誌標線號誌行駛,,春日路與民光東路口,25.006225,121.312167,往北,50,桃園分局,
+"""
+
+# Miaoli: Keelung-style suffixed headers plus trailing unnamed columns; rows
+# are shorter than the header. 80（40） is a car/scooter split limit.
+CSV_172174 = """設備編號,型式,縣市,行政區,設置區域描述,設置地點(路口或路段),"取締項目(以""、""分隔)",座標緯度,座標經度,拍攝方向,速限,管轄單位,備註,,,,,
+1,雷達,苗栗縣,苗栗市,,新川里柑園5號前處,測速,24.578798,120.803745,東向西,60,苗栗分局,,
+9,非線圈數位-雷達,苗栗縣,銅鑼鄉,,縣道128線與苗27線口處,闖紅燈,24.4988,120.80876,北向南,60,苗栗分局,,
+5,非線圈數位-雷達,苗栗縣,苗栗市,,英才路與文發路口,闖紅燈、測速,24.590336,120.815263,北向南,50,苗栗分局,,
+24,非線圈數位-雷達,苗栗縣,竹南鎮,,台61線91公里快（側）車道與博愛街口處,闖紅燈,24.693142,120.859948,南向北,80（40）,竹南分局,,
+"""
+
+# Hsinchu City: three columns, the location header carries an embedded space.
+CSV_178144 = """地 點,經度,緯度
+新竹市北區經國路二段、中正路口,120.96447,24.811973
+新竹市東區經國路一段、公道五路口,120.98523,24.815077
+"""
+
+# Pingtung: 7320's English headers glossed in parentheses; 區間測速 rows are
+# flagged in direct and describe a km span rather than a point.
+CSV_159972 = """CityName(設置縣市),RegionName(設置市區鄉鎮),Address(設置地址),DeptNm(管轄警局),BranchNm(管轄分局),Longitude(經度),Latitude(緯度),direct(拍攝方向),limit(速限)
+屏東縣,屏東市,屏東市逢甲路與復興路口,屏東縣政府縣警察局,屏東分局,120.489191,22.671134,單向,50
+屏東縣,里港鄉,里港鄉台3線與鐵店路口,屏東縣政府縣警察局,里港分局,120.497438,22.777618,單向,50
+屏東縣,佳冬鄉,台1線戰備道429.5-433K,屏東縣政府縣警察局,枋寮分局,120.563046,22.442275,南北雙向(區間測速),70
+"""
+
+
+def test_178168_types_bearings_and_area_prefix():
+    cameras, unresolved, stats = parse_178168(CSV_178168, "2026-09-04")
+    assert not unresolved
+    by_desc = {cam.description: cam for cam in cameras}
+    red = by_desc["桃園區 三民路一段與自強路口"]  # 行政區 prefixed when absent from the place
+    assert red.type == "red_light" and red.bearing is None and red.speed_limit is None  # 雙向, '-'
+    assert red.city == "桃園市"
+    speed = by_desc["蘆竹區濱海路一段與海湖北路"]  # place already names the district
+    assert speed.type == "fixed" and speed.speed_limit == 70  # 超速 keeps fixed for 25935/7320 twins
+    assert by_desc["桃園區 三民路三段與中正路口"].type == "tech"  # 未停讓行人
+    north = by_desc["桃園區 春日路與民光東路口"]
+    assert north.bearing == 0.0 and north.speed_limit == 50  # 往北
+    assert stats["178168_type:fixed"] == 2
+
+
+def test_172174_suffixed_headers_and_split_limit():
+    cameras, unresolved, stats = parse_172174(CSV_172174, "2026-09-04")
+    assert not unresolved
+    assert len(cameras) == 4
+    by_desc = {cam.description: cam for cam in cameras}
+    radar = by_desc["苗栗市 新川里柑園5號前處"]
+    assert radar.type == "fixed" and radar.bearing == 270.0 and radar.speed_limit == 60  # 東向西
+    assert radar.city == "苗栗縣"
+    assert by_desc["銅鑼鄉 縣道128線與苗27線口處"].type == "red_light"
+    assert by_desc["苗栗市 英才路與文發路口"].type == "fixed"  # 闖紅燈、測速 measures speed
+    split = by_desc["竹南鎮 台61線91公里快（側）車道與博愛街口處"]
+    assert split.speed_limit is None and split.bearing == 0.0  # 80（40）, 南向北
+    assert stats["172174_type:fixed"] == 2 and stats["172174_type:red_light"] == 2
+
+
+def test_178144_three_column_shape():
+    cameras, unresolved, stats = parse_178144(CSV_178144, "2026-09-04")
+    assert not unresolved
+    assert [cam.description for cam in cameras] == ["新竹市北區經國路二段、中正路口", "新竹市東區經國路一段、公道五路口"]
+    assert all(cam.type == "tech" and cam.city == "新竹市" for cam in cameras)
+    assert all(cam.bearing is None and cam.speed_limit is None for cam in cameras)
+    assert 24.8 < cameras[0].lat < 24.9 and 120.9 < cameras[0].lon < 121.0
+    assert stats["178144_type:tech"] == 2
+    # the header may lose its embedded space upstream
+    cameras, _, _ = parse_178144(CSV_178144.replace("地 點", "地點", 1), "2026-09-04")
+    assert len(cameras) == 2
+
+
+def test_159972_glossed_headers_and_section_exclusion():
+    cameras, unresolved, stats = parse_159972(CSV_159972, "2026-09-04")
+    assert not unresolved
+    assert stats["159972_sections_excluded"] == 1  # 台1線戰備道 區間測速 span
+    assert [cam.description for cam in cameras] == ["屏東市逢甲路與復興路口", "里港鄉台3線與鐵店路口"]
+    assert all(cam.type == "tech" and cam.city == "屏東縣" for cam in cameras)
+    assert all(cam.bearing is None for cam in cameras)  # 單向 names no compass direction
+    assert cameras[0].speed_limit == 50
+    assert 22.6 < cameras[0].lat < 22.7 and 120.4 < cameras[0].lon < 120.5

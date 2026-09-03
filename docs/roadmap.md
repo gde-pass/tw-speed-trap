@@ -122,6 +122,19 @@ and 雪山隧道 100857 (section lists without coordinates — copied into
 嘉義縣 178140/178143 (TLS handshake too weak for modern OpenSSL), 臺東
 177486 (no CSV resource).
 
+The 2026-09 catalog sweep followed the data.gov.tw export growing from 115
+to 176 keyword matches once municipal-platform datasets started appearing in
+it. Integrated 桃園 178168, 苗栗 172174, 新竹市 178144, 屏東 159972 and the
+freeway-police ramp red-lights 100856 (+202 points after dedupe; one 100856
+row 37 km from its freeway is dropped by the new corridor test in
+`freeway_check`). Recorded as unusable: 金門 178121 (host sends an
+incomplete TWCA chain), 臺東 172687/174945/176011/178424 and 花蓮
+171349/177297 (PDF or XLSX only), 嘉義市 161852 (no coordinates). The other
+forty-odd ids were superseded Kaohsiung editions, New Taipei per-district
+shards and older Yunlin editions with nothing new. 雲林 publishes each
+edition under a fresh id (178357/178358 is the 1150817 pair), so the used
+178085/178086 will need swapping when a later edition changes content.
+
 Upstream monitoring is automated: the monthly `dataset-watch` workflow diffs
 the data.gov.tw catalog against `pipeline/data/dataset_watch.yaml`, checks
 that used datasets still resolve, re-checks coordinate-less ones (Tainan

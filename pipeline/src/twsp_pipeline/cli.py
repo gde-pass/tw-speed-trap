@@ -33,6 +33,11 @@ from .parse import (
     SOURCE_177827,
     SOURCE_25935,
     SOURCE_7320,
+    SOURCE_100856,
+    SOURCE_178168,
+    SOURCE_172174,
+    SOURCE_178144,
+    SOURCE_159972,
     parse_130111,
     parse_13940,
     parse_156415,
@@ -51,18 +56,27 @@ from .parse import (
     parse_177827,
     parse_25935,
     parse_7320,
+    parse_100856,
+    parse_178168,
+    parse_172174,
+    parse_178144,
+    parse_159972,
 )
 from .sections import load_sections, suppress_section_hint_points
 
 # Order = dedupe priority: national sets first (13940's stable equipment ids
-# and 7320's coverage win ties), then municipal sets richest-metadata first —
-# 130111 before 135957 so Taipei red-light twins keep bearing and speed limit,
-# 176549 before the other Kaohsiung sets for the same reason.
+# and 7320's coverage win ties; 100856's ramp red-lights overlap neither), then
+# municipal sets richest-metadata first — 130111 before 135957 so Taipei
+# red-light twins keep bearing and speed limit, 25935 before 178168 so Taoyuan
+# speed twins keep their equipment ids, 176549 before the other Kaohsiung sets
+# for the same reason.
 DATASETS = (
     (13940, parse_13940, SOURCE_13940),
     (7320, parse_7320, SOURCE_7320),
+    (100856, parse_100856, SOURCE_100856),
     (130111, parse_130111, SOURCE_130111),
     (25935, parse_25935, SOURCE_25935),
+    (178168, parse_178168, SOURCE_178168),
     (135957, parse_135957, SOURCE_135957),
     (170673, parse_170673, SOURCE_170673),
     (176549, parse_176549, SOURCE_176549),
@@ -77,6 +91,9 @@ DATASETS = (
     (178159, parse_178159, SOURCE_178159),
     (156415, parse_156415, SOURCE_156415),
     (172940, parse_172940, SOURCE_172940),
+    (172174, parse_172174, SOURCE_172174),
+    (159972, parse_159972, SOURCE_159972),
+    (178144, parse_178144, SOURCE_178144),
 )
 
 

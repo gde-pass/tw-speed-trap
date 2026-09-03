@@ -1,4 +1,4 @@
-from twsp_pipeline.freeway_check import check_freeway_markers, parse_marker
+from twsp_pipeline.freeway_check import check_freeway_markers, freeway_of, parse_marker
 from twsp_pipeline.model import Camera
 
 
@@ -125,3 +125,25 @@ def test_known_279_ghost_regression():
     assert "ghost" not in [c.id for c in kept]
     assert "good279" in [c.id for c in kept]
     assert dropped["freeway_mislocated:gov.tw:7320"] == 1
+
+
+def test_freeway_of_reads_prefix_without_km():
+    assert freeway_of("國道1號 桃園交流道南下入口匝道") == "1"
+    assert freeway_of("國道三號甲線西向3.4公里") == "3甲"
+    assert freeway_of("中山路國道一號涵洞前") is None
+
+
+def test_unmarked_freeway_row_must_sit_near_a_marker_row():
+    marked = [
+        cam("a", km_south(10), 121.0, "國道一號南向10公里"),
+        cam("b", km_south(50), 121.0, "國道一號南向50公里"),
+    ]
+    near = cam("near", km_south(12), 121.01, "國道1號 某交流道南下入口匝道", bearing=None, source="gov.tw:100856")
+    # ~150 km east of every 國道1 marker row
+    far = cam("far", km_south(12), 122.5, "國道1號 某交流道北上入口環道", bearing=None, source="gov.tw:100856")
+    # no 國道6 marker rows at all: geometry unknown, keep (fail-safe)
+    orphan = cam("orphan", km_south(12), 121.0, "國道6號 舊正交流道西向出口匝道", bearing=None, source="gov.tw:100856")
+    kept, dropped, report = check_freeway_markers(marked + [near, far, orphan])
+    assert [c.id for c in kept] == ["a", "b", "near", "orphan"]
+    assert dropped == {"freeway_off_corridor:gov.tw:100856": 1}
+    assert any(line.startswith("off corridor: gov.tw:100856 國道1號 某交流道北上入口環道") for line in report)

@@ -6,6 +6,7 @@ break the weekly build, not silently produce an empty database.
 
 import csv
 import io
+import re
 from collections import Counter
 
 from .model import Camera, Unresolved
@@ -30,6 +31,11 @@ SOURCE_178086 = "gov.tw:178086"
 SOURCE_178159 = "gov.tw:178159"
 SOURCE_156415 = "gov.tw:156415"
 SOURCE_172940 = "gov.tw:172940"
+SOURCE_100856 = "gov.tw:100856"
+SOURCE_178168 = "gov.tw:178168"
+SOURCE_172174 = "gov.tw:172174"
+SOURCE_178144 = "gov.tw:178144"
+SOURCE_159972 = "gov.tw:159972"
 
 
 class SchemaError(RuntimeError):
@@ -130,6 +136,42 @@ def parse_13940(text: str, today: str) -> tuple[list[Camera], list[Unresolved], 
                 city=(row.get("縣市") or "").strip() or "國道",
                 description=description,
                 source=SOURCE_13940,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats
+
+
+def parse_100856(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Freeway-police red-light cameras on interchange ramps (國道公路警察局
+    闖紅燈照相地點). Ten rows, no direction or limit. The 國道N號 prefix is kept
+    on the description so freeway_check can corridor-test the row: upstream
+    ships at least one ramp tens of km from the interchange it names."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    _require_columns(reader.fieldnames, {"道路編號", "設置地點", "WGS84_東_經度", "WGS84_北_緯度"}, SOURCE_100856)
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        road = (row.get("道路編號") or "").strip()
+        place = (row.get("設置地點") or "").strip()
+        try:
+            lat, lon = normalize_coords(row.get("WGS84_北_緯度"), row.get("WGS84_東_經度"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(SOURCE_100856, str(e), dict(row)))
+            continue
+        stats["100856_type:red_light"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(SOURCE_100856, lat, lon, None),
+                lat=lat,
+                lon=lon,
+                type="red_light",
+                speed_limit=None,
+                bearing=None,
+                city="國道",
+                description=f"{road} {place}".strip(),
+                source=SOURCE_100856,
                 last_seen=today,
             )
         )
@@ -596,3 +638,109 @@ def parse_178085(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
 def parse_178086(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
     """Yunlin tech enforcement (1150715 雲林縣警察局科技執法設備)."""
     return _parse_yunlin(text, today, SOURCE_178086)
+
+
+def parse_178168(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Taoyuan tech enforcement (桃園市科技執法設備地點): county-standard columns
+    with an underscore-suffixed location column. 速限 is '-' on most rows and
+    拍攝方向 mostly 雙向, so few rows carry a bearing or limit; rows listing 超速
+    stay `fixed` so they dedupe against their 25935/7320 twins."""
+    return _parse_county_standard(text, today, SOURCE_178168, ("設置地點_路口或路段", "設置地點"), ("取締項目",))
+
+
+def parse_172174(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Miaoli fixed speed and red-light cameras (苗栗縣固定式闖紅燈、測速照相設備
+    取締地點): Keelung-style suffixed county-standard columns plus a trailing
+    unnamed column. 速限 '80（40）' (car/scooter) parses as no limit."""
+    return _parse_county_standard(text, today, SOURCE_172174, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)
+
+
+_PLACE_COLS_178144 = ("地 點", "地點")
+
+
+def parse_178144(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Hsinchu City tech enforcement (新竹市科技執法點位資訊): three columns —
+    a location header with an embedded space, 經度, 緯度. No items, direction
+    or limit, so every row is `tech` with a null bearing."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    fields = set(reader.fieldnames or ())
+    place_col = next((c for c in _PLACE_COLS_178144 if c in fields), _PLACE_COLS_178144[0])
+    _require_columns(reader.fieldnames, {place_col, "經度", "緯度"}, SOURCE_178144)
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        place = (row.get(place_col) or "").strip()
+        if _is_section(place):
+            stats["178144_sections_excluded"] += 1
+            continue
+        try:
+            lat, lon = normalize_coords(row.get("緯度"), row.get("經度"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(SOURCE_178144, str(e), dict(row)))
+            continue
+        stats["178144_type:tech"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(SOURCE_178144, lat, lon, None),
+                lat=lat,
+                lon=lon,
+                type="tech",
+                speed_limit=None,
+                bearing=None,
+                city="新竹市",
+                description=place,
+                source=SOURCE_178144,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats
+
+
+# 159972 glosses 7320's English headers in parentheses: CityName(設置縣市).
+_HEADER_GLOSS = re.compile(r"\(.*?\)\s*$")
+
+
+def parse_159972(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Pingtung tech enforcement (屏東縣科技執法路段及項目): 7320's English
+    headers with a Chinese gloss in parentheses. 拍攝方向 is 單向 (no bearing)
+    on point rows and 雙向(區間測速) on the three average-speed rows, which are
+    excluded here and tracked as sections.yaml candidates."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    reader.fieldnames = [_HEADER_GLOSS.sub("", name or "").strip() for name in (reader.fieldnames or [])]
+    _require_columns(
+        reader.fieldnames, {"CityName", "Address", "Longitude", "Latitude", "direct", "limit"}, SOURCE_159972
+    )
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        direct = (row.get("direct") or "").strip()
+        address = (row.get("Address") or "").strip()
+        if _is_section(direct) or _is_section(address):
+            stats["159972_sections_excluded"] += 1
+            continue
+        bearing = parse_bearing(direct)
+        try:
+            lat, lon = normalize_coords(row.get("Latitude"), row.get("Longitude"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(SOURCE_159972, str(e), dict(row)))
+            continue
+        region = (row.get("RegionName") or "").strip()
+        description = address if not region or region in address else f"{region} {address}"
+        stats["159972_type:tech"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(SOURCE_159972, lat, lon, bearing),
+                lat=lat,
+                lon=lon,
+                type="tech",
+                speed_limit=parse_limit(row.get("limit")),
+                bearing=bearing,
+                city=(row.get("CityName") or "").strip() or "屏東縣",
+                description=description,
+                source=SOURCE_159972,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats

@@ -19,6 +19,11 @@ After validation, rows from different sources carrying the same marker
 device geocoded twice — beyond dedupe's 45 m cross-source radius but the
 marker says same pole. The earlier source wins, mirroring dedupe
 priority, and (like dedupe) the dropped row donates its speed limit.
+Rows that name a freeway but carry no kilometre (interchange-ramp
+cameras in 100856) get a corridor test instead: they must sit within
+CORRIDOR_KM of some marker row on the same freeway. A freeway with no
+marker rows leaves its ramp rows unchecked (fail-safe).
+
 All drops are counted and reported, never silent.
 """
 
@@ -30,6 +35,7 @@ from .dedupe import _bearings_compatible
 from .model import Camera
 
 SLACK_KM = 15.0
+CORRIDOR_KM = 15.0
 MIN_CONFLICTS = 2
 MARKER_KM_TOL = 0.2
 DUP_MAX_KM = 1.0
@@ -46,6 +52,16 @@ _KM = re.compile(r"(\d+(?:\.\d+)?)\s*公里")
 _EARTH_RADIUS_KM = 6371.0
 
 
+def freeway_of(description: str | None) -> str | None:
+    """Freeway key ("1", "3甲") when the description starts with 國道…, else None."""
+    if not description:
+        return None
+    m = _HEAD.match(description)
+    if not m:
+        return None
+    return _NUMERALS.get(m.group(1), m.group(1)) + (m.group(2) or "")
+
+
 def parse_marker(description: str | None) -> tuple[str, str | None, float] | None:
     """(freeway, direction, km) from a 國道…公里 description, else None.
 
@@ -54,11 +70,9 @@ def parse_marker(description: str | None) -> tuple[str, str | None, float] | Non
     """
     if not description:
         return None
-    m = _HEAD.match(description)
-    if not m:
+    freeway = freeway_of(description)
+    if freeway is None:
         return None
-    number = _NUMERALS.get(m.group(1), m.group(1))
-    freeway = number + (m.group(2) or "")
     km = _KM.search(description)
     if not km:
         return None
@@ -122,6 +136,32 @@ def _validate(cameras: list[Camera]) -> tuple[list[Camera], Counter, list[str]]:
     return kept, dropped, report
 
 
+def _validate_unmarked(cameras: list[Camera]) -> tuple[list[Camera], Counter, list[str]]:
+    marked: dict[str, list[Camera]] = defaultdict(list)
+    for cam in cameras:
+        marker = parse_marker(cam.description)
+        if marker:
+            marked[marker[0]].append(cam)
+
+    dropped: Counter = Counter()
+    report: list[str] = []
+    kept: list[Camera] = []
+    for cam in cameras:
+        freeway = freeway_of(cam.description)
+        if freeway is None or parse_marker(cam.description) is not None or not marked.get(freeway):
+            kept.append(cam)
+            continue
+        nearest = min(_distance_km(cam, other) for other in marked[freeway])
+        if nearest <= CORRIDOR_KM:
+            kept.append(cam)
+            continue
+        dropped[f"freeway_off_corridor:{cam.source}"] += 1
+        report.append(
+            f"off corridor: {cam.source} {cam.description} ({cam.lat}, {cam.lon}) "
+            f"is {nearest:.0f} km from the nearest 國道{freeway} marker row")
+    return kept, dropped, report
+
+
 def _merge_marker_duplicates(cameras: list[Camera]) -> tuple[list[Camera], Counter, list[str]]:
     dropped: Counter = Counter()
     report: list[str] = []
@@ -166,8 +206,11 @@ def _merge_marker_duplicates(cameras: list[Camera]) -> tuple[list[Camera], Count
 
 
 def check_freeway_markers(cameras: list[Camera]) -> tuple[list[Camera], Counter, list[str]]:
-    """Validate marker geometry, then merge same-marker cross-source rows."""
+    """Validate marker geometry, corridor-test unmarked freeway rows against
+    the surviving markers, then merge same-marker cross-source rows."""
     kept, dropped, report = _validate(cameras)
+    kept, corridor_dropped, corridor_report = _validate_unmarked(kept)
+    dropped.update(corridor_dropped)
     kept, dup_dropped, dup_report = _merge_marker_duplicates(kept)
     dropped.update(dup_dropped)
-    return kept, dropped, report + dup_report
+    return kept, dropped, report + corridor_report + dup_report

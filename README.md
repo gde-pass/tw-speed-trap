@@ -196,6 +196,11 @@ derivative works with attribution:
 - [基隆市科技執法取締地點 (dataset 178159)](https://data.gov.tw/dataset/178159)
 - [澎湖縣固定測速照相設置地點表 (dataset 156415)](https://data.gov.tw/dataset/156415)
 - [澎湖縣科技執法地點 (dataset 172940)](https://data.gov.tw/dataset/172940)
+- [國道公路警察局闖紅燈照相地點 (dataset 100856)](https://data.gov.tw/dataset/100856)
+- [桃園市科技執法設備地點 (dataset 178168)](https://data.gov.tw/dataset/178168)
+- [苗栗縣固定式闖紅燈、測速照相設備取締地點 (dataset 172174)](https://data.gov.tw/dataset/172174)
+- [屏東縣科技執法路段及項目 (dataset 159972)](https://data.gov.tw/dataset/159972)
+- [新竹市科技執法點位資訊 (dataset 178144)](https://data.gov.tw/dataset/178144)
 
 資料來源：政府資料開放平臺 (data.gov.tw)。
 

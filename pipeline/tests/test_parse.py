@@ -1,5 +1,5 @@
 import pytest
-from twsp_pipeline.parse import SchemaError, parse_13940, parse_7320
+from twsp_pipeline.parse import SchemaError, parse_100856, parse_13940, parse_7320
 
 CSV_7320 = """CityName,RegionName,Address,DeptNm,BranchNm,Longitude,Latitude,direct,limit
 設置縣市,設置市區鄉鎮,設置地址,管轄警局,管轄分局,經度,緯度,拍攝方向,速限
@@ -78,3 +78,29 @@ def test_13940_excludes_section_rows():
     assert [c.description for c in cameras] == ["國道一號南向100公里"]
     assert stats["skipped_section_row"] == 1
     assert not unresolved
+
+
+# Freeway-police ramp red-lights. Row 2 sits 14 km from the interchange it
+# names: the parser keeps it, freeway_check's corridor test decides.
+CSV_100856 = """項次,道路編號,設置地點,WGS84_東_經度,WGS84_北_緯度,備註
+1,國道1號,桃園交流道南下入口匝道,121.296171,25.037337,國道1號桃園交流道南下入口匝道
+2,國道1號,桃園交流道南下入口環道,121.16066,25.0055,國道1號桃園交流道南下入口環道
+10,國道6號,舊正交流道西向出口匝道,120.41471,24.00475,國道6號舊正交流道西向出口匝道
+"""
+
+
+def test_100856_ramp_red_lights_keep_freeway_prefix():
+    cameras, unresolved, stats = parse_100856(CSV_100856, "2026-09-04")
+    assert not unresolved
+    assert stats["100856_type:red_light"] == 3
+    ramp = cameras[0]
+    assert ramp.type == "red_light" and ramp.city == "國道"
+    assert ramp.description == "國道1號 桃園交流道南下入口匝道"  # 國道N號 prefix feeds the corridor test
+    assert ramp.bearing is None and ramp.speed_limit is None
+    assert (ramp.lat, ramp.lon) == (25.037337, 121.296171)
+    assert cameras[2].description.startswith("國道6號 ")
+
+
+def test_100856_missing_columns_fail_loudly():
+    with pytest.raises(SchemaError):
+        parse_100856("項次,設置地點,經度,緯度\n1,x,121.3,25.0\n", "2026-09-04")
