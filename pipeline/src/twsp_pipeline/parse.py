@@ -185,23 +185,36 @@ def parse_130111(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
     return cameras, unresolved, stats
 
 
+# Taipei publishes the location column with full-width parentheses; keep the
+# ASCII and bare spellings as fallbacks in case it drifts toward the county
+# template (Keelung 178159 uses ASCII, Penghu 172940 dropped the suffix).
+_PLACE_COLS_135957 = ("設置地點（路口或路段）", "設置地點(路口或路段)", "設置地點")
+
+
 def parse_135957(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
     """Taipei tech-enforcement devices (臺北市智慧管理科技執法設備資料表).
-    座標-X is longitude, 座標-Y latitude; quoted fields span multiple lines."""
+    Re-published in 2026-08 on the county-standard template (Big5; 科技執法種類,
+    設置地點（路口或路段）, 座標緯度/座標經度) — the old 名稱/取締路段/座標-X/座標-Y
+    shape is gone. No 拍攝方向 or 速限 columns: bearing stays null (alert both
+    ways) and no limit is stored; 130111 twins donate both at dedupe."""
     reader = csv.DictReader(io.StringIO(_strip_bom(text)))
-    _require_columns(reader.fieldnames, {"名稱", "取締路段", "座標-X", "座標-Y", "取締項目"}, SOURCE_135957)
+    fields = set(reader.fieldnames or ())
+    place_col = next((c for c in _PLACE_COLS_135957 if c in fields), _PLACE_COLS_135957[0])
+    _require_columns(
+        reader.fieldnames, {"科技執法種類", "取締項目", place_col, "座標緯度", "座標經度"}, SOURCE_135957
+    )
     cameras: list[Camera] = []
     unresolved: list[Unresolved] = []
     stats: Counter = Counter()
     for row in reader:
-        name = (row.get("名稱") or "").strip()
+        kind = (row.get("科技執法種類") or "").strip()
         items = (row.get("取締項目") or "").strip()
-        if _is_section(name):
+        if _is_section(kind) or _is_section(items):
             stats["135957_sections_excluded"] += 1
             continue
         cam_type = "red_light" if "闖紅燈" in items else "tech"
         try:
-            lat, lon = normalize_coords(row.get("座標-Y"), row.get("座標-X"))
+            lat, lon = normalize_coords(row.get("座標緯度"), row.get("座標經度"))
         except CoordinateError as e:
             unresolved.append(Unresolved(SOURCE_135957, str(e), dict(row)))
             continue
@@ -214,8 +227,8 @@ def parse_135957(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
                 type=cam_type,
                 speed_limit=None,
                 bearing=None,
-                city="臺北市",
-                description=(row.get("取締路段") or "").strip(),
+                city=(row.get("縣市") or "").strip() or "臺北市",
+                description=(row.get(place_col) or "").strip(),
                 source=SOURCE_135957,
                 last_seen=today,
             )

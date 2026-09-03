@@ -44,13 +44,12 @@ CSV_130111 = """編號,功能,設置路段,設置地點,緯度,經度,轄區,拍
 142,區間測速及跨越雙白線,自強隧道,,25.09060141,121.5492556,中山、士林,南北雙向,50,臺北市,63000
 """
 
-# 座標-X is longitude, 座標-Y latitude; 啟用日期 spans multiple lines.
-CSV_135957 = """編號,名稱,取締路段,座標-X,座標-Y,啟用日期,取締項目
-1,區間平均速率,自強隧道,121.549309,25.090898,"108年9月1日
-109年4月停用
-111年2月21日重啟",超速、跨越雙白線
-5,路口多功能,鄭州路與西寧北路口,121.508087,25.050537,111年1月3日,闖紅燈、不停讓行人、不依規定轉彎、不依標誌標線號誌指示行駛
-10,違規停車,重慶北路三段278號前,121.513304,25.072913,110年7月1日,違規停車
+# County-standard template since 2026-08: full-width parentheses on the
+# location column, 縣市 present, no 拍攝方向/速限, 區間 rows flagged in 科技執法種類.
+CSV_135957 = """編號,縣市,縣市代碼,行政區,科技執法種類,取締項目,設置地點（路口或路段）,座標緯度,座標經度,啟用時間,啟用民國日期,啟用日期,備註
+1,臺北市,63000,大同區,路口多功能執法,闖紅燈、不停讓行人、不依規定轉彎、不依標誌標線號誌指示行駛,鄭州路與西寧北路口,25.05049695,121.5081673,111年1月3日,111-01-03,2022-01-03,
+13,臺北市,63000,大同區,違規停車科技執法,違規停車,重慶北路三段278號前　,25.072913,121.513304,110年7月1日,110-07-01,2021-07-01,
+92,臺北市,63000,士林區、中山區,區間平均速率科技執法,區間測速及跨越雙白線 ,自強隧道,25.090937,121.549277,108年9月1日,108-09-01,2019-09-01,109年4月停用；111年2月21日重啟
 """
 
 CSV_25935 = """設備編號,型式,縣市,行政區,設置區域描述,設置地點_路口或路段,取締項目,座標緯度,座標經度,拍攝方向,速限,管轄單位,備註
@@ -106,16 +105,30 @@ def test_130111_type_split_and_section_exclusion():
     assert by_desc["環河北路2段 昌吉街口"].speed_limit is None  # multi-line per-direction limit
 
 
-def test_135957_xy_columns_and_multiline_fields():
-    cameras, unresolved, stats = parse_135957(CSV_135957, "2026-08-11")
+def test_135957_county_template_and_section_exclusion():
+    cameras, unresolved, stats = parse_135957(CSV_135957, "2026-09-03")
     assert not unresolved
-    assert stats["135957_sections_excluded"] == 1  # 區間平均速率 despite multi-line dates
+    assert stats["135957_sections_excluded"] == 1  # 區間平均速率科技執法 tunnel row
     assert len(cameras) == 2
     intersection = next(cam for cam in cameras if cam.description == "鄭州路與西寧北路口")
     assert intersection.type == "red_light"
+    assert intersection.city == "臺北市"
+    assert intersection.bearing is None and intersection.speed_limit is None  # no such columns
     assert 25.0 < intersection.lat < 25.1 and 121.5 < intersection.lon < 121.6
-    parking = next(cam for cam in cameras if cam.description == "重慶北路三段278號前")
+    parking = next(cam for cam in cameras if cam.description == "重慶北路三段278號前")  # U+3000 stripped
     assert parking.type == "tech"
+
+
+def test_135957_accepts_ascii_parentheses_on_location_column():
+    ascii_header = CSV_135957.replace("設置地點（路口或路段）", "設置地點(路口或路段)", 1)
+    cameras, _, _ = parse_135957(ascii_header, "2026-09-03")
+    assert {cam.description for cam in cameras} == {"鄭州路與西寧北路口", "重慶北路三段278號前"}
+
+
+def test_135957_legacy_xy_shape_fails_loudly():
+    legacy = "編號,名稱,取締路段,座標-X,座標-Y,啟用日期,取締項目\n5,路口多功能,鄭州路與西寧北路口,121.508087,25.050537,111年1月3日,闖紅燈\n"
+    with pytest.raises(SchemaError):
+        parse_135957(legacy, "2026-09-03")
 
 
 def test_25935_types_and_stable_equipment_ids():
