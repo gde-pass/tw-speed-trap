@@ -19,6 +19,9 @@ jobs:
   update:
     name: Rebuild camera database
     runs-on: ubuntu-latest
+    # Backstop for the per-request wall-clock deadline in fetch.py: a normal
+    # run finishes in well under half of this even with several dead hosts.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

@@ -20,7 +20,7 @@ from pathlib import Path
 import yaml
 
 from .decode import decode_bytes
-from .fetch import DATASET_API, FetchError, _get, download, extract_csv_payloads, resolve_csv_url
+from .fetch import DATASET_API, FetchError, _get, _get_json, download, extract_csv_payloads, resolve_csv_url
 
 CATALOG_EXPORT_URL = "https://data.gov.tw/datasets/export/csv?type=dataset"
 COORD_COLUMNS = re.compile(r"經度|緯度|座標|lat|lon", re.IGNORECASE)
@@ -58,7 +58,7 @@ def new_datasets(matches: dict[str, str], baseline: dict) -> dict[str, str]:
 
 def dataset_listed(dataset_id: int) -> bool:
     try:
-        return bool(_get(DATASET_API.format(dataset_id=dataset_id)).json().get("success"))
+        return bool(_get_json(DATASET_API.format(dataset_id=dataset_id)).get("success"))
     except FetchError:
         return False
 
@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         "--baseline", type=Path, default=Path("pipeline/data/dataset_watch.yaml"), help="watch baseline YAML"
     )
     parser.add_argument(
-        "--catalog", type=Path, default=None, help="local catalog export CSV (skips the ~45 MB download)"
+        "--catalog", type=Path, default=None, help="local catalog export CSV (skips the ~70 MB download)"
     )
     args = parser.parse_args(argv)
 
@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         # decode_bytes, not a hardcoded utf-8-sig: an encoding change upstream
         # must not crash the monthly watch.
-        catalog_csv = decode_bytes(_get(CATALOG_EXPORT_URL).content)
+        catalog_csv = decode_bytes(_get(CATALOG_EXPORT_URL))
     matches = catalog_matches(catalog_csv, keywords)
     print(f"catalog: {len(matches)} keyword-matching datasets", file=sys.stderr)
 

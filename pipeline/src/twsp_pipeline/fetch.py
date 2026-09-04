@@ -6,6 +6,7 @@ currently lives.
 """
 
 import io
+import json
 import ssl
 import time
 import urllib.parse
@@ -18,12 +19,22 @@ import requests.adapters
 DATASET_API = "https://data.gov.tw/api/v2/rest/dataset/{dataset_id}"
 USER_AGENT = "tw-speed-trap-pipeline/0.1 (+https://github.com/gde-pass/tw-speed-trap)"
 TIMEOUT_S = 60
+# Wall clock per request. TIMEOUT_S only bounds the gap between bytes, so a
+# host that drip-feeds a byte a minute never trips it (2026-09: odws.hccg.gov.tw
+# and ws.yunlin.gov.tw each held one request open for about an hour). Sized
+# for the ~70 MB catalog export the monthly watch downloads (6 s on a runner).
+DEADLINE_S = 120
+_CHUNK_BYTES = 64 * 1024
 RETRIES = 3
 MAX_DOWNLOAD_BYTES = 200 * 1024 * 1024
 MAX_ZIP_MEMBER_BYTES = 100 * 1024 * 1024
 
 
 class FetchError(RuntimeError):
+    pass
+
+
+class _DeadlineExceeded(Exception):
     pass
 
 
@@ -66,7 +77,28 @@ _timed_out_hosts: set[str] = set()
 _NEVER_BLACKLIST = {"data.gov.tw", "www.data.gov.tw"}
 
 
-def _get(url: str) -> requests.Response:
+def _read_body(resp: requests.Response, url: str, started: float) -> bytes:
+    """Stream the body under the wall-clock deadline. read1 hands back
+    whatever the socket has as soon as anything arrives, so the clock is
+    checked per network read, not per filled 64 KiB buffer; the size cap is
+    enforced as bytes accumulate instead of after a full download."""
+    chunks: list[bytes] = []
+    size = 0
+    while True:
+        chunk = resp.raw.read1(_CHUNK_BYTES, decode_content=True)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        size += len(chunk)
+        if size > MAX_DOWNLOAD_BYTES:
+            raise FetchError(f"{url}: response larger than {MAX_DOWNLOAD_BYTES} bytes")
+        if time.monotonic() - started > DEADLINE_S:
+            raise _DeadlineExceeded(f"{size} bytes after {DEADLINE_S} s wall clock")
+
+
+def _get(url: str) -> bytes:
+    """GET body with retries, a browser-identity fallback, per-host fast-fail
+    and a per-request wall-clock deadline."""
     host = urllib.parse.urlsplit(url).hostname or ""
     if host in _timed_out_hosts:
         raise FetchError(f"skipping {url}: {host} already timed out this run")
@@ -76,14 +108,24 @@ def _get(url: str) -> requests.Response:
             {"User-Agent": USER_AGENT},
             {"User-Agent": BROWSER_UA, "Referer": "https://data.gov.tw/"},
         ):
+            started = time.monotonic()
             try:
-                resp = _session.get(url, headers=headers, timeout=TIMEOUT_S)
-                resp.raise_for_status()
-                return resp
+                with _session.get(url, headers=headers, timeout=TIMEOUT_S, stream=True) as resp:
+                    resp.raise_for_status()
+                    return _read_body(resp, url, started)
             except requests.exceptions.ConnectTimeout as e:
                 if host not in _NEVER_BLACKLIST:
                     _timed_out_hosts.add(host)
                 raise FetchError(f"failed to fetch {url}: {e}") from e
+            except _DeadlineExceeded as e:
+                # A drip-feeding host is not a transient fault: each retry
+                # would burn another DEADLINE_S, so write it off like a
+                # connect timeout.
+                if host not in _NEVER_BLACKLIST:
+                    _timed_out_hosts.add(host)
+                raise FetchError(f"failed to fetch {url}: {e}") from e
+            except FetchError:
+                raise  # size cap: the next attempt would be just as large
             except Exception as e:  # noqa: BLE001 - retry on any transport error
                 last_error = e
         if attempt < RETRIES - 1:
@@ -91,9 +133,13 @@ def _get(url: str) -> requests.Response:
     raise FetchError(f"failed to fetch {url}: {last_error}")
 
 
+def _get_json(url: str) -> dict:
+    return json.loads(_get(url))
+
+
 def resolve_csv_url(dataset_id: int) -> str:
     """Ask the data.gov.tw v2 API for the current CSV resource URL."""
-    data = _get(DATASET_API.format(dataset_id=dataset_id)).json()
+    data = _get_json(DATASET_API.format(dataset_id=dataset_id))
     if not data.get("success"):
         raise FetchError(f"dataset API returned success=false for {dataset_id}")
     try:
@@ -108,10 +154,7 @@ def resolve_csv_url(dataset_id: int) -> str:
 
 
 def download(url: str) -> bytes:
-    content = _get(url).content
-    if len(content) > MAX_DOWNLOAD_BYTES:
-        raise FetchError(f"{url}: response larger than {MAX_DOWNLOAD_BYTES} bytes")
-    return content
+    return _get(url)
 
 
 def extract_csv_payloads(data: bytes) -> list[bytes]:
