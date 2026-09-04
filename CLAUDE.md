@@ -3,7 +3,8 @@
 ## Build & test
 - Android: `JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./gradlew :detection:test :app:testDebugUnitTest assembleDebug ktlintCheck detekt` — run `ktlintFormat` first
 - Pipeline: `uv run --project pipeline pytest`; full build: `uv run --project pipeline build-db --out pipeline/out --geojson data/cameras.geojson --assets-db app/src/main/assets/cameras.db --cache pipeline/out/cache`
-- Delete `pipeline/out/cache/` to force live fetches; a **local** build-db run refreshes data.kcg.gov.tw (unreachable from CI — Kaohsiung sources ride the snapshot fallback there)
+- Delete `pipeline/out/cache/` to force live fetches; a **local** build-db run refreshes the hosts GitHub runners can't reach — data.kcg.gov.tw (Kaohsiung), www.klg.gov.tw (基隆 178159), www-ws.pthg.gov.tw (屏東 159972), odws.hccg.gov.tw (新竹市 178144) and tgos.tw 13940 (403) — which ride the snapshot fallback on CI (the weekly pipeline step takes ~10 min burning their retries; that's normal)
+- Scripts needing pipeline deps (yaml, requests, `twsp_pipeline`): `uv run --project pipeline python script.py` from the repo root — system `python3` has neither
 - Gradle prints no test counts — parse `*/build/test-results/**/*.xml` with a python one-liner
 - Emulator: AVD `Pixel_XL_API_32`; adb at `~/Library/Android/sdk/platform-tools/adb`; `apksigner`/`aapt2` in `~/Library/Android/sdk/build-tools/<latest>/` need JAVA_HOME exported; screenshots are 1440×2560 rendered at 1125×2000 → multiply displayed coords ×1.28 before `input tap`
 - `adb root` works on the AVD — start the non-exported service directly (`am start-foreground-service -n io.github.gdepass.twspeedtrap/.service.DetectionService`, append `-a io.github.gdepass.twspeedtrap.STOP` to stop) after `pm grant`ing location perms; no UI tapping needed
@@ -22,6 +23,14 @@
 - Publish gate is `content_hash` (excludes last_seen); the db file's sha256 changes every run by design
 - If data changed: dispatch data-update.yml, don't push main while it runs, wait for green
 - Release workflow publishes only a bare changelog link — after it's green, add real notes with `gh release edit vX.Y.Z --notes` (match prior releases' tone: rider-facing bullets + test count)
+- A green data-update always commits its own snapshot (db sha changes per run) even when its content_hash equals the local build — `git pull --ff-only origin main` before pushing again
+- Run `gh workflow run` on its own with a short timeout (it hung >2 min chained after a push), then poll with a background `until`-loop on `gh run view --json status`; `gh run watch` blew a 10-min timeout once
+
+## Pipeline data sources
+- The weekly job's usual failure is an upstream header rename (135957 moved to the county template + Big5, 172940 dropped a suffix): read the SchemaError's `found` list in `gh run view --log-failed`, fix with a candidate-column list (first present wins, none present still raises) as in `_parse_county_standard`, and copy verbatim live rows into the test fixture
+- Dataset-watch triage: probe each flagged id with the pipeline's own `resolve_csv_url`/`download`/`decode_bytes` (plain `requests` fails TLS on GRCA/TWCA hosts — use `fetch._session`); the value bar is points >50 m from any camera in data/cameras.geojson; the catalog export's coverage jumps (115→176 matches in 2026-09) so old datasets surface as "new"; record every evaluated id in dataset_watch.yaml with a dated comment, then close the issue the workflow comments on
+- Data quality traps seen: coordinate columns swapped (金門 178121, 雲林), lon/lat 10–30 km off the named place (100856 ramps → the `freeway_check` corridor rule drops 國道N號 rows without a km marker that sit >15 km from that freeway's marker rows), "CSV" resources that are scanned PDFs (臺東), download fields holding several CRLF-joined URLs
+- `fetch._get` returns bytes (`_get_json` for JSON) under a 120 s wall-clock deadline (`DEADLINE_S`); a deadline hit blacklists the host for the run like a connect timeout; hosts that omit their intermediate cert get it bundled in `pipeline/src/twsp_pipeline/certs/` (recipe: leaf's AIA CA-Issuers URL → PEM → `openssl verify -CAfile <certifi> -untrusted int.pem leaf.pem` → drop in certs/)
 
 ## Architecture invariants
 - detection/ is pure JVM and GPX-replay-deterministic: fix timestamps only — no wall clocks, no randomness
@@ -33,3 +42,5 @@
 ## Tooling quirks
 - The rtk hook sometimes mangles grep/head output — fall back to `python3 -c` one-liners for text extraction
 - `pipeline/src/twsp_pipeline/watch.py` contains literal `\ufeff` escape sequences that defeat the Edit tool's matcher — edit that file via a python script
+- Bash cwd persists across tool calls, so a `cd pipeline && …` in one parallel call breaks siblings — use absolute paths or `uv run --project pipeline …` from the repo root
+- rtk also truncates `cat`/`head` of background-task output files — read them with a `python3 -c "print(open(...).read())"` one-liner
