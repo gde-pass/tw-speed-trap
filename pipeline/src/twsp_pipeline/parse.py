@@ -36,6 +36,7 @@ SOURCE_178168 = "gov.tw:178168"
 SOURCE_172174 = "gov.tw:172174"
 SOURCE_178144 = "gov.tw:178144"
 SOURCE_159972 = "gov.tw:159972"
+SOURCE_178121 = "gov.tw:178121"
 
 
 class SchemaError(RuntimeError):
@@ -740,6 +741,46 @@ def parse_159972(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
                 city=(row.get("CityName") or "").strip() or "屏東縣",
                 description=description,
                 source=SOURCE_159972,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats
+
+
+def parse_178121(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Kinmen tech enforcement (金門縣固定式科學儀器執法設備設置地點-科技執法).
+    座標緯度 holds the longitude and 座標經度 the latitude (normalize_coords
+    un-swaps); no direction or limit columns. The host omits its TWCA
+    intermediate certificate, which fetch.py bundles."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    _require_columns(reader.fieldnames, {"取締項目", "設置地點", "座標緯度", "座標經度"}, SOURCE_178121)
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        items = (row.get("取締項目") or "").strip()
+        place = (row.get("設置地點") or "").strip()
+        if _is_section(items) or _is_section(place):
+            stats["178121_sections_excluded"] += 1
+            continue
+        cam_type = "red_light" if "闖紅燈" in items else "tech"
+        try:
+            lat, lon = normalize_coords(row.get("座標緯度"), row.get("座標經度"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(SOURCE_178121, str(e), dict(row)))
+            continue
+        stats[f"178121_type:{cam_type}"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(SOURCE_178121, lat, lon, None),
+                lat=lat,
+                lon=lon,
+                type=cam_type,
+                speed_limit=None,
+                bearing=None,
+                city=(row.get("縣市") or "").strip() or "金門縣",
+                description=place,
+                source=SOURCE_178121,
                 last_seen=today,
             )
         )

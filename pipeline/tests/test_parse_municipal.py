@@ -26,6 +26,7 @@ from twsp_pipeline.parse import (
     parse_172174,
     parse_178144,
     parse_159972,
+    parse_178121,
 )
 
 # Header carries a DOUBLE BOM; 經度 holds latitude (~24.x) and 緯度 longitude;
@@ -199,6 +200,7 @@ def test_municipal_missing_columns_fail_loudly():
         parse_172174,
         parse_178144,
         parse_159972,
+        parse_178121,
     )
     for parse in parsers:
         with pytest.raises(SchemaError):
@@ -369,3 +371,27 @@ def test_159972_glossed_headers_and_section_exclusion():
     assert all(cam.bearing is None for cam in cameras)  # 單向 names no compass direction
     assert cameras[0].speed_limit == 50
     assert 22.6 < cameras[0].lat < 22.7 and 120.4 < cameras[0].lon < 120.5
+
+
+# Kinmen: 座標緯度 carries the longitude (118.x) and 座標經度 the latitude (24.x).
+CSV_178121 = """設備編號,縣市,取締項目,設置地點,座標緯度,座標經度,管轄分局
+1,金門縣,闖紅燈、未依標誌標線號誌行駛、車不讓人,金城鎮民生路與民權路口,118.318362,24.437089,金城分局
+7,金門縣,闖紅燈,金寧鄉伯玉路2段(盤果路口),118.340612,24.441227,金城分局
+9,金門縣,跨越雙黃線,金門大橋,118.298374,24.452041,金城分局
+10,金門縣,違規(臨時)停車,金城鎮民權路(西南門)光前路(金門高中),118.314528,24.433499,金城分局
+"""
+
+
+def test_178121_swapped_coordinates_and_types():
+    cameras, unresolved, stats = parse_178121(CSV_178121, "2026-09-04")
+    assert not unresolved
+    assert len(cameras) == 4
+    by_desc = {cam.description: cam for cam in cameras}
+    red = by_desc["金城鎮民生路與民權路口"]
+    assert red.type == "red_light" and red.city == "金門縣"
+    assert 24.4 < red.lat < 24.5 and 118.3 < red.lon < 118.4  # un-swapped
+    assert red.bearing is None and red.speed_limit is None
+    assert by_desc["金寧鄉伯玉路2段(盤果路口)"].type == "red_light"
+    assert by_desc["金門大橋"].type == "tech"  # 跨越雙黃線
+    assert by_desc["金城鎮民權路(西南門)光前路(金門高中)"].type == "tech"  # 違規(臨時)停車
+    assert stats["178121_type:red_light"] == 2 and stats["178121_type:tech"] == 2

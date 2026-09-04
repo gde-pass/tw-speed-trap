@@ -31,6 +31,7 @@ used:
   172174: 苗栗縣固定式闖紅燈、測速照相設備取締地點
   178144: 新竹市科技執法點位資訊
   159972: 屏東縣科技執法路段及項目
+  178121: 金門縣固定式科學儀器執法設備設置地點-科技執法
 
 waiting_for_coordinates:
   139129: 臺南市智慧管理科技執法設備設置地點 — descriptions only, no coordinate columns (2026-08)
@@ -183,7 +184,6 @@ seen:
   177468: 1150422雲林縣警察局固定式測速照相設備設置地點一覽表
   177486: 臺東縣警察局115年「固定式取締違規照相桿暨科技執法偵測」設置地點公告1150424
   177925: 1150706雲林縣警察局固定式測速照相設備設置地點一覽表
-  178121: 金門縣固定式科學儀器執法設備設置地點-科技執法  # host sends an incomplete TWCA chain so Python verification fails; 12 rows, 8 new — import once the intermediate is bundled (2026-09)
   178140: 嘉義縣警察局固定式科技執法設置地點  # host ws-tm.cyhg.gov.tw fails TLS (DH key too small) (2026-08)
   178143: 嘉義縣警察局固定式測速照相設置地點  # host ws-tm.cyhg.gov.tw fails TLS (DH key too small) (2026-08)
   178357: 1150817雲林縣警察局科技執法設備設置地點一覽表  # 1150817 edition of 178086: same coverage, Address/direct/limit headers with lon/lat swapped — swap in when the parser gains the variant (2026-09)

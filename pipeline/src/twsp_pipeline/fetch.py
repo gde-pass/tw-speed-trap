@@ -11,6 +11,7 @@ import ssl
 import time
 import urllib.parse
 import zipfile
+from pathlib import Path
 
 import certifi
 import requests
@@ -38,18 +39,34 @@ class _DeadlineExceeded(Exception):
     pass
 
 
+# Intermediates some .gov.tw hosts leave out of their handshake.
+# ws.kinmen.gov.tw sends only its leaf (issued by TWCA Secure SSL CA); curl
+# fetches the missing link through the AIA URL but OpenSSL does not, so the
+# chain to certifi's TWCA Global Root CA never builds. Loading the
+# intermediate into the store lets OpenSSL complete the chain. Trust still
+# rests on the certifi root: the file was chain-verified against it when
+# bundled and expires 2030-10-16.
+_EXTRA_CA_BUNDLE = Path(__file__).with_name("certs") / "twca-secure-ssl-ca.pem"
+
+
+def _ssl_context() -> ssl.SSLContext:
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    ctx.load_verify_locations(cafile=str(_EXTRA_CA_BUNDLE))
+    return ctx
+
+
 class _RelaxedStrictnessAdapter(requests.adapters.HTTPAdapter):
     """Taiwanese government certificates (GRCA-issued, e.g. tgos.tw) often
     lack the Subject Key Identifier extension, which Python 3.13's default
     VERIFY_X509_STRICT rejects. Keep chain-of-trust verification (against
-    the same certifi bundle requests normally uses); drop only the
-    format-strictness flag. Resource hosts churn between runs, so this is
-    mounted for the whole session rather than a hardcoded host list."""
+    the same certifi bundle requests normally uses, plus the bundled
+    intermediates above); drop only the format-strictness flag. Resource
+    hosts churn between runs, so this is mounted for the whole session
+    rather than a hardcoded host list."""
 
     def init_poolmanager(self, *args, **kwargs):
-        ctx = ssl.create_default_context(cafile=certifi.where())
-        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
-        kwargs["ssl_context"] = ctx
+        kwargs["ssl_context"] = _ssl_context()
         return super().init_poolmanager(*args, **kwargs)
 
 

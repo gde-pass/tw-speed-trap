@@ -201,6 +201,7 @@ derivative works with attribution:
 - [苗栗縣固定式闖紅燈、測速照相設備取締地點 (dataset 172174)](https://data.gov.tw/dataset/172174)
 - [屏東縣科技執法路段及項目 (dataset 159972)](https://data.gov.tw/dataset/159972)
 - [新竹市科技執法點位資訊 (dataset 178144)](https://data.gov.tw/dataset/178144)
+- [金門縣固定式科學儀器執法設備設置地點-科技執法 (dataset 178121)](https://data.gov.tw/dataset/178121)
 
 資料來源：政府資料開放平臺 (data.gov.tw)。
 

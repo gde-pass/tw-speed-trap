@@ -38,6 +38,7 @@ from .parse import (
     SOURCE_172174,
     SOURCE_178144,
     SOURCE_159972,
+    SOURCE_178121,
     parse_130111,
     parse_13940,
     parse_156415,
@@ -61,6 +62,7 @@ from .parse import (
     parse_172174,
     parse_178144,
     parse_159972,
+    parse_178121,
 )
 from .sections import load_sections, suppress_section_hint_points
 
@@ -94,6 +96,7 @@ DATASETS = (
     (172174, parse_172174, SOURCE_172174),
     (159972, parse_159972, SOURCE_159972),
     (178144, parse_178144, SOURCE_178144),
+    (178121, parse_178121, SOURCE_178121),
 )
 
 

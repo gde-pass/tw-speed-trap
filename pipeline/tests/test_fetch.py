@@ -70,6 +70,13 @@ def local_server():
     server.shutdown()
 
 
+def test_ssl_context_bundles_the_twca_intermediate():
+    subjects = [dict(rdn[0] for rdn in cert["subject"]) for cert in fetch._ssl_context().get_ca_certs()]
+    names = {s.get("commonName") for s in subjects}
+    assert "TWCA Secure SSL Certification Authority" in names  # bundled: ws.kinmen.gov.tw omits it
+    assert "TWCA Global Root CA" in names  # its issuer, from certifi — the chain still ends at a public root
+
+
 def test_fast_response_returns_body(local_server):
     assert fetch._get(f"{local_server}/fast") == b"id,name\n1,ok\n"
 

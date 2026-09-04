@@ -40,7 +40,8 @@ they change over time):
   [172940](https://data.gov.tw/dataset/172940) 澎湖,
   [172174](https://data.gov.tw/dataset/172174) 苗栗,
   [159972](https://data.gov.tw/dataset/159972) 屏東,
-  [178144](https://data.gov.tw/dataset/178144) 新竹市
+  [178144](https://data.gov.tw/dataset/178144) 新竹市,
+  [178121](https://data.gov.tw/dataset/178121) 金門
 
 Average-speed (區間測速) rows in any source are excluded from point import —
 sections are hand-curated in `data/sections.yaml` with entry/exit pairs.
