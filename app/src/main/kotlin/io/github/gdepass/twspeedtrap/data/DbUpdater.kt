@@ -67,7 +67,12 @@ class DbUpdater(
         val signature =
             fetch(SIGNATURE_URL, MAX_SIGNATURE_BYTES) ?: return UpdateResult.Failed("signature download failed")
         if (!UpdateVerifier.verifySignature(manifestBytes, signature)) {
-            return UpdateResult.Failed("manifest signature invalid", permanent = true)
+            // Not permanent: the release uploads manifest and signature one
+            // after the other, so a check landing in that window sees a new
+            // manifest with last week's signature. Retrying costs two tiny
+            // fetches on the backoff curve; a genuinely bad signature keeps
+            // failing and the database is never touched.
+            return UpdateResult.Failed("manifest signature invalid")
         }
         val manifest = UpdateVerifier.parseManifest(manifestBytes.decodeToString())
         if (manifest.schemaVersion > UpdateVerifier.SUPPORTED_SCHEMA_VERSION) {

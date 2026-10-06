@@ -136,6 +136,22 @@ shards and older Yunlin editions with nothing new. 雲林 publishes each
 edition under a fresh id (178357/178358 is the 1150817 pair), so the used
 178085/178086 will need swapping when a later edition changes content.
 
+The 2026-10 sweep started from a rider complaint (passing Taichung cameras
+without an alert) and found the watch's keyword blind spot: Taichung's own
+fixed-camera list is titled 科學儀器執法設備, and a dozen 違規照相 /
+區間平均速率 lists never matched either. Integrated 臺中 83881 (+118 points —
+the national set has none of the city's red-light cameras), 彰化 27969,
+新竹縣 109336/173211 and 臺東 178734 (first Taitung source with coordinates;
+three Big5 files behind one CRLF-joined resource URL). The 7320↔83881 twins
+showed one device geocoded up to ~120 m apart by two agencies, so same-type
+rows that both carry an agreeing bearing now merge up to 120 m. The same
+sweep fixed a bearing bug: 「西往北」-style turn-movement rows were stored with
+the exit direction, silencing 81 Kaohsiung cameras for the riders they
+photograph. Recorded as unusable: 省道 169929 (Incapsula bot wall), 臺南
+53645 and 臺中 mobile 170672 (no coordinates), plus eight 區間 lists copied
+into the `sections.yaml` candidates (新北 126156 has both gantries per
+direction and is the best next section batch).
+
 Upstream monitoring is automated: the monthly `dataset-watch` workflow diffs
 the data.gov.tw catalog against `pipeline/data/dataset_watch.yaml`, checks
 that used datasets still resolve, re-checks coordinate-less ones (Tainan

@@ -95,3 +95,14 @@ def test_size_cap_stops_the_download_early(local_server, monkeypatch):
     monkeypatch.setattr(fetch, "MAX_DOWNLOAD_BYTES", 8)
     with pytest.raises(fetch.FetchError, match="larger than 8 bytes"):
         fetch._get(f"{local_server}/fast")
+
+
+def test_split_resource_urls_handles_crlf_joined_fields():
+    field = "https://a.gov.tw/download?id=1%3D%3D\r\n\r\nhttps://a.gov.tw/download?id=2\r\n\r\nhttps://a.gov.tw/x.csv\r\n"
+    assert fetch.split_resource_urls(field) == [
+        "https://a.gov.tw/download?id=1%3D%3D",
+        "https://a.gov.tw/download?id=2",
+        "https://a.gov.tw/x.csv",
+    ]
+    assert fetch.split_resource_urls("https://a.gov.tw/one.csv") == ["https://a.gov.tw/one.csv"]
+    assert fetch.split_resource_urls("") == []

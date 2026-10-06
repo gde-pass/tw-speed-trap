@@ -5,6 +5,11 @@ import re
 
 # Bearing of the direction of travel being enforced. 「北向南」/「往南」/「南向」
 # all mean southbound traffic is photographed → alert users heading ~180°.
+# 「X向Y」 is read from the APPROACH side: the rider comes from X, so the
+# enforced heading is the opposite of X. For a straight movement (北向南)
+# that equals Y; for a turn movement (西往北, 違規左轉 cameras in Kaohsiung's
+# tech lists) the rider approaches heading east, not north — storing Y there
+# silenced the camera for the rider it photographs and alerted cross traffic.
 _DIR_BEARING = {
     "北": 0.0,
     "東北": 45.0,
@@ -34,7 +39,8 @@ def parse_bearing(text: str | None) -> float | None:
         return None
     m = _FROM_TO.fullmatch(t)
     if m:
-        return _DIR_BEARING.get(m.group(2))
+        origin = _DIR_BEARING.get(m.group(1))
+        return None if origin is None else (origin + 180.0) % 360.0
     m = _TOWARDS.fullmatch(t)
     if m:
         return _DIR_BEARING.get(m.group(1))

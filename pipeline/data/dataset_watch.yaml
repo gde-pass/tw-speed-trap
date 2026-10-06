@@ -5,7 +5,11 @@
 #   seen:    known; '# candidate' marks ones still worth evaluating
 #   waiting_for_coordinates: skipped only because they lack coordinates
 
-keywords: "科技執法|測速照相|測速執法|闖紅燈"
+# 2026-10: widened after a manual catalog sweep found 臺中's own fixed-camera
+# list (83881 科學儀器執法設備) and a dozen 違規照相 / 區間平均速率 lists the
+# old pattern never matched. Statistics-only titles (件數, 績效) still match
+# and are recorded under seen: with a comment.
+keywords: "科技執法|測速|闖紅燈|科學儀器執法|違規照相|區間平均速率"
 
 used:
   156415: 澎湖縣固定測速照相設置地點表
@@ -32,12 +36,39 @@ used:
   178144: 新竹市科技執法點位資訊
   159972: 屏東縣科技執法路段及項目
   178121: 金門縣固定式科學儀器執法設備設置地點-科技執法
+  83881: 臺中市科學儀器執法設備取締地點(固定式)
+  27969: 彰化縣警察局固定式取締違規照相設備設置地點一覽表
+  109336: 新竹縣政府警察局固定式科學儀器執法設備設置地點
+  173211: 新竹縣政府警察局固定測速設置地點
+  178734: 臺東縣警察局取締違規照相設備暨科技執法偵測設置地點一覽表115.9.30
 
 waiting_for_coordinates:
+  53645: 臺南市固定式交通違規照相設備設置地點 — 194 rows, km markers and road names only (2026-10)
+  170672: 臺中市科學儀器執法設備取締地點(移動式) — 386 mobile spots, 經度/緯度 columns present but empty (2026-10)
   139129: 臺南市智慧管理科技執法設備設置地點 — descriptions only, no coordinate columns (2026-08)
   161852: 嘉義市固定式科技執法自動偵測系統設置地點 — descriptions only, no coordinate columns (2026-09)
 
 seen:
+  169929: 省道測速取締圖資省道測速取締圖資  # 交通部公路局; the download sits behind an Incapsula bot wall (HTML challenge), unreachable for scripts (2026-10)
+  67491: 新竹市違規自動照相固定桿設置地點  # host odws.hccg.gov.tw unreachable from here and CI; 178144 covers 新竹市 (2026-10)
+  98101: 高雄市107年固定式違規照相設備設置地點  # superseded by the 115年 series (2026-10)
+  178119: 金門縣固定式科學儀器執法設備設置地點  # 35 rows, all within 45 m of the used 178121 (2026-10)
+  144355: 雲林縣警察局固定式違規照相設備及區間平均速率自動偵測照相系統設置地點一覽表  # 90 rows, 2 new vs 178085/178086; 台61 區間 rows noted in sections.yaml candidates (2026-10)
+  178735: 臺東縣警察局取締違規照相設備暨科技執法偵測設置地點公告及一覽表  # PDF twin of 178734 (2026-10)
+  178161: 彰化縣區間測速設備設置地點  # 1 區間 row (台61 177→168.1K), sections.yaml candidate (2026-10)
+  171261: 南投縣政府警察局固定式區間平均速率執法設備設置地點  # 臺21 53.8↔51.1K, one coordinate per direction, sections.yaml candidate (2026-10)
+  172950: 新竹縣政府警察局區間平均速率裝置  # 台3 82.2→84.3K, 台15 鳳鼻尾隧道 66.3→69.5K, sections.yaml candidates (2026-10)
+  178412: 苗栗縣區間平均速率執法設備取締地點  # 14 區間 rows with one coordinate each (one lon typo 122.67), sections.yaml candidates (2026-10)
+  178120: 金門縣固定式科學儀器執法設備設置地點-區間測速  # 金門大橋 sections already curated (2026-10)
+  126156: 區間平均速率執法設備設置地點  # 新北 14 rows with start+end coordinates per direction — best sections.yaml candidate set, see its comment block (2026-10)
+  176559: 高雄市115年區間平均速率執法設備設置地點  # 6 區間 rows with one coordinate each, data.kcg.gov.tw (2026-10)
+  127499: 高雄市109年區間平均速率執法設備設置地點  # superseded by 176559, no coordinates (2026-10)
+  172801: 113年下半年臺東縣警察局區間測速設置地點與取締  # PDF (2026-10)
+  173070: 113年基隆警察局區間測速設置地點、偵測範圍及取締件數一覽表  # statistics (2026-10)
+  172952: 苗栗縣區間測速設備取締件數  # statistics (2026-10)
+  171463: 桃園市區間測速地點及舉發數量每半年統計(2024上半年及下半年)  # statistics (2026-10)
+  113543: 雷射測速儀檢查合格單資料集  # instrument certification, not locations (2026-10)
+  113544: 雷達測速儀檢查合格單資料集  # instrument certification, not locations (2026-10)
   13908: 測速執法點取締件數資料
   26835: 新北市固定式測速照相  # city-wide 新北 dataset, delisted from data.gov.tw
   38357: 南投縣政府警察局固定式自動測速照相桿  # host data.nantou.gov.tw drops connections (2026-08)

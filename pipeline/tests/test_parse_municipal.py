@@ -27,6 +27,11 @@ from twsp_pipeline.parse import (
     parse_178144,
     parse_159972,
     parse_178121,
+    parse_83881,
+    parse_27969,
+    parse_109336,
+    parse_173211,
+    parse_178734,
 )
 
 # Header carries a DOUBLE BOM; 經度 holds latitude (~24.x) and 緯度 longitude;
@@ -395,3 +400,114 @@ def test_178121_swapped_coordinates_and_types():
     assert by_desc["金門大橋"].type == "tech"  # 跨越雙黃線
     assert by_desc["金城鎮民權路(西南門)光前路(金門高中)"].type == "tech"  # 違規(臨時)停車
     assert stats["178121_type:red_light"] == 2 and stats["178121_type:tech"] == 2
+
+
+# Taichung's own fixed list: no 縣市 column, four cardinal 往 directions + 雙向.
+CSV_83881 = """設備編號,行政區,設置地點,取締項目,座標緯度,座標經度,拍攝方向,速限,管轄單位,備註
+1,中區,中區建國路與民權路口,闖紅燈、不依標誌、標線、號誌指示行駛,24.13584,120.68225,西往東,50,第一分局,
+2,中區,中區三民路三段與公園路口,闖紅燈、不依標誌、標線、號誌指示行駛、超速,24.14563,120.68389,北往南,50,第一分局,
+6,西區,西區忠明南路與忠明南路326巷口,不依標誌、標線、號誌指示行駛、超速,24.13749,120.65723,雙向,50,第一分局,
+"""
+
+
+def test_83881_taichung_fixed_city_and_types():
+    cameras, unresolved, stats = parse_83881(CSV_83881, "2026-10-07")
+    assert not unresolved
+    assert [cam.city for cam in cameras] == ["臺中市"] * 3
+    red, speed, dual = cameras
+    assert red.type == "red_light" and red.bearing == 90.0 and red.speed_limit == 50
+    assert red.description == "中區建國路與民權路口"  # district already in the text, no prefix
+    assert speed.type == "fixed" and speed.bearing == 180.0
+    assert dual.type == "fixed" and dual.bearing is None
+    assert stats["83881_type:fixed"] == 2
+
+
+CSV_27969 = """設備編號,縣市,行政區,設置地點,取締項目,座標緯度,座標經度,拍攝方向,速限,管轄分局,備註
+1,彰化縣,彰化市,中山路與中正路口(省道),超速、闖紅燈,24.0841,120.552648,南向北,50,彰化分局,
+3,彰化縣,彰化市,彰南路(\xa0台14線)與福興路口(省道),超速、闖紅燈,24.046296,120.621996,西向東,70,彰化分局,
+"""
+
+
+def test_27969_changhua_fixed():
+    cameras, unresolved, _ = parse_27969(CSV_27969, "2026-10-07")
+    assert not unresolved
+    assert [cam.type for cam in cameras] == ["fixed", "fixed"]
+    assert cameras[0].bearing == 0.0 and cameras[0].speed_limit == 50
+    assert cameras[1].description == "彰化市 彰南路(\xa0台14線)與福興路口(省道)"
+    assert cameras[1].city == "彰化縣"
+
+
+# 新竹縣: bare 緯度/經度, 種類 column, junction devices with 拍攝方向 路口 and 速限 —.
+CSV_109336 = """編號,縣市,行政區,種類,取締項目,設置地點,緯度,經度,拍攝方向,速限,轄區分局
+1,新竹縣,竹北市,路口多功能科技執法,闖紅燈、未依標誌標線號誌行駛,中華路與中正東路口,24.838744,121.00524,路口,—,竹北分局
+"""
+
+CSV_173211 = """編號,縣市,行政區,種類,取締項目,設置地點,緯度,經度,拍攝方向,速限,轄區分局
+1,新竹縣,竹北市,固定式測速,超速,竹北市中華路212號前北上,24.831233,121.002334,雙向,50,竹北分局
+3,新竹縣,竹北市,固定式測速,超速,竹北市中華路與鳳岡路口北上,24.854761,121.002936,南往北,50,竹北分局
+"""
+
+
+def test_hsinchu_county_bare_coordinate_columns():
+    cameras, unresolved, _ = parse_109336(CSV_109336, "2026-10-07")
+    assert not unresolved
+    (junction,) = cameras
+    assert junction.type == "red_light"
+    assert junction.bearing is None  # 路口: no direction → alert both ways
+    assert junction.speed_limit is None  # —
+    assert junction.lat == 24.838744 and junction.lon == 121.00524
+
+    cameras, unresolved, _ = parse_173211(CSV_173211, "2026-10-07")
+    assert not unresolved
+    assert [cam.type for cam in cameras] == ["fixed", "fixed"]
+    assert cameras[0].bearing is None and cameras[1].bearing == 0.0
+    assert cameras[0].speed_limit == 50
+
+
+# 臺東: Keelung-style suffixed columns, 座標緯度/座標經度 swapped, and a 區間 file
+# whose coordinate fields hold both gantries.
+CSV_178734_FIXED = """縣市,設備編號,型式,行政區,設置區域描述,設置地點(路口或路段),"取締項目(以""、""分隔)",座標緯度,座標經度,拍攝方向,速限,管轄分局,備註
+臺東縣,1,,長濱鄉,,臺東縣長濱鄉臺11線84.13K(長光段),測速,121.46233,23.329169,南向北,50,交通警察隊,
+"""
+
+CSV_178734_TECH = """縣市,設備編號,型式,行政區,科技執法種類,"取締項目(以""、""分隔)",設置區域描述,設置地點(路口或路段),座標緯度,座標經度,拍攝方向,速限,轄區分局,備註,
+臺東縣,1,,達仁鄉,路口多功能執法,禁駛、不遵守公路命令、任意變換車道或其他未依標誌標線號誌指示,草埔森永隧道北上,臺9線433.07~433.72K,120.832788,22.258216,北向南,,交通警察隊,,行經設有停車再開標誌不依規定停讓
+"""
+
+CSV_178734_SECTION = """縣市,設備編號,型式,行政區,設置區域描述,設置地點(路口或路段),"取締項目(以""、""分隔)",座標緯度,座標經度,拍攝方向,速限,管轄分局,備註
+臺東縣,1,,達仁鄉,森永至壽卡休憩亭,臺9戊線3.94~9.92K,測速(區間平均速率),"120.8645642,22.2779495","120.841083,22.254910",南向北、北向南,40,交通警察隊,
+"""
+
+
+def test_178734_taitung_three_files_swapped_coords_and_sections():
+    cameras, unresolved, _ = parse_178734(CSV_178734_FIXED, "2026-10-07")
+    assert not unresolved
+    (speed,) = cameras
+    assert speed.type == "fixed"
+    assert (speed.lat, speed.lon) == (23.329169, 121.46233)  # un-swapped
+    assert speed.bearing == 0.0 and speed.speed_limit == 50
+    assert speed.description == "臺東縣長濱鄉臺11線84.13K(長光段)"  # district already in the text
+
+    cameras, unresolved, _ = parse_178734(CSV_178734_TECH, "2026-10-07")
+    assert not unresolved
+    (tech,) = cameras
+    assert tech.type == "tech" and tech.bearing == 180.0 and tech.speed_limit is None
+    assert tech.lat == 22.258216
+
+    cameras, unresolved, stats = parse_178734(CSV_178734_SECTION, "2026-10-07")
+    assert cameras == [] and not unresolved
+    assert stats["178734_sections_excluded"] == 1
+
+
+CSV_178734_TWO_DEVICES = """縣市,設備編號,型式,行政區,科技執法種類,"取締項目(以""、""分隔)",設置區域描述,設置地點(路口或路段),座標緯度,座標經度,拍攝方向,速限,轄區分局,備註,
+臺東縣,8,,臺東市,路口多功能執法,闖紅燈、未禮讓行人或其他未依標誌標線號誌指示,,博愛路與鐵花路口(含桂林北路),"121.145427, 22.753813","121.145143, 22.753677",東向西、西向東,,交通警察隊,,
+"""
+
+
+def test_178734_two_devices_in_one_row():
+    cameras, unresolved, _ = parse_178734(CSV_178734_TWO_DEVICES, "2026-10-07")
+    assert not unresolved
+    assert [(cam.lat, cam.lon) for cam in cameras] == [(22.753813, 121.145427), (22.753677, 121.145143)]
+    assert {cam.type for cam in cameras} == {"red_light"}
+    assert {cam.bearing for cam in cameras} == {None}  # 東向西、西向東 → both directions
+    assert len({cam.id for cam in cameras}) == 2

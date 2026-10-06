@@ -37,6 +37,11 @@ SOURCE_172174 = "gov.tw:172174"
 SOURCE_178144 = "gov.tw:178144"
 SOURCE_159972 = "gov.tw:159972"
 SOURCE_178121 = "gov.tw:178121"
+SOURCE_83881 = "gov.tw:83881"
+SOURCE_27969 = "gov.tw:27969"
+SOURCE_109336 = "gov.tw:109336"
+SOURCE_173211 = "gov.tw:173211"
+SOURCE_178734 = "gov.tw:178734"
 
 
 class SchemaError(RuntimeError):
@@ -496,30 +501,65 @@ def parse_177827(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
     return _parse_kaohsiung_tech(text, today, SOURCE_177827, "設置位置")
 
 
+_KIND_COLS = ("科技執法種類", "種類")
+_LAT_COLS = ("座標緯度", "緯度")
+_LON_COLS = ("座標經度", "經度")
+
+
+def _first_present(candidates: tuple[str, ...], fields: set[str]) -> str:
+    return next((c for c in candidates if c in fields), candidates[0])
+
+
+def _coordinate_pairs(lat_raw: str | None, lon_raw: str | None) -> list[tuple[str, str]]:
+    """Usually one (lat, lon) pair. 臺東 178734 lists two devices of one
+    junction as "lon, lat" in EACH coordinate column — then each column is a
+    device of its own (normalize_coords un-swaps the order)."""
+    lat_raw = lat_raw or ""
+    lon_raw = lon_raw or ""
+    if "," in lat_raw and "," in lon_raw:
+        pairs = []
+        for field in (lat_raw, lon_raw):
+            first, second = field.split(",", 1)
+            pairs.append((first.strip(), second.strip()))
+        return pairs
+    return [(lat_raw, lon_raw)]
+
+
 def _parse_county_standard(
-    text: str, today: str, source: str, place_cols: tuple[str, ...], items_cols: tuple[str, ...]
+    text: str,
+    today: str,
+    source: str,
+    place_cols: tuple[str, ...],
+    items_cols: tuple[str, ...],
+    city: str | None = None,
 ) -> tuple[list[Camera], list[Unresolved], Counter]:
-    """Shared county open-data shape (彰化/基隆/澎湖): 13940-family Chinese
-    columns, with per-county suffix variations on the location and items
-    column names. Those names drift upstream (澎湖 172940 dropped the
+    """Shared county open-data shape (彰化/基隆/澎湖/臺中/新竹縣/臺東): 13940-family
+    Chinese columns, with per-county suffix variations on the location and
+    items column names. Those names drift upstream (澎湖 172940 dropped the
     (路口或路段) suffix in 2026-08), so both are candidate lists — the first
-    present in the header wins; none present still raises SchemaError.
+    present in the header wins; none present still raises SchemaError. The
+    coordinate columns are 座標緯度/座標經度 or bare 緯度/經度 (新竹縣), and a
+    dataset that omits 縣市 (臺中 83881) passes its city explicitly.
     Speed-measuring rows stay `fixed` so they dedupe against their national
     7320 twins (彰化's list is byte-identical positions)."""
     reader = csv.DictReader(io.StringIO(_strip_bom(text)))
     fields = set(reader.fieldnames or ())
-    place_col = next((c for c in place_cols if c in fields), place_cols[0])
-    items_col = next((c for c in items_cols if c in fields), items_cols[0])
-    _require_columns(
-        reader.fieldnames, {"縣市", "行政區", place_col, items_col, "座標緯度", "座標經度", "拍攝方向", "速限"}, source
-    )
+    place_col = _first_present(place_cols, fields)
+    items_col = _first_present(items_cols, fields)
+    kind_col = _first_present(_KIND_COLS, fields)
+    lat_col = _first_present(_LAT_COLS, fields)
+    lon_col = _first_present(_LON_COLS, fields)
+    required = {"行政區", place_col, items_col, lat_col, lon_col, "拍攝方向", "速限"}
+    if city is None:
+        required.add("縣市")
+    _require_columns(reader.fieldnames, required, source)
     dataset_id = source.rsplit(":", 1)[-1]
     cameras: list[Camera] = []
     unresolved: list[Unresolved] = []
     stats: Counter = Counter()
     for row in reader:
         items = (row.get(items_col) or "").strip()
-        kind = (row.get("科技執法種類") or "").strip()
+        kind = (row.get(kind_col) or "").strip()
         if _is_section(items) or _is_section(kind):
             stats[f"{dataset_id}_sections_excluded"] += 1
             continue
@@ -529,31 +569,32 @@ def _parse_county_standard(
             cam_type = "red_light"
         else:
             cam_type = "tech"
-        try:
-            lat, lon = normalize_coords(row.get("座標緯度"), row.get("座標經度"))
-        except CoordinateError as e:
-            unresolved.append(Unresolved(source, str(e), dict(row)))
-            continue
         description = (row.get(place_col) or "").strip()
         area = (row.get("行政區") or "").strip()
         if area and area not in description:
             description = f"{area} {description}".strip()
         bearing = parse_bearing(row.get("拍攝方向"))
-        stats[f"{dataset_id}_type:{cam_type}"] += 1
-        cameras.append(
-            Camera(
-                id=make_id(source, lat, lon, bearing),
-                lat=lat,
-                lon=lon,
-                type=cam_type,
-                speed_limit=parse_limit(row.get("速限")),
-                bearing=bearing,
-                city=(row.get("縣市") or "").strip(),
-                description=description,
-                source=source,
-                last_seen=today,
+        for lat_raw, lon_raw in _coordinate_pairs(row.get(lat_col), row.get(lon_col)):
+            try:
+                lat, lon = normalize_coords(lat_raw, lon_raw)
+            except CoordinateError as e:
+                unresolved.append(Unresolved(source, str(e), dict(row)))
+                continue
+            stats[f"{dataset_id}_type:{cam_type}"] += 1
+            cameras.append(
+                Camera(
+                    id=make_id(source, lat, lon, bearing),
+                    lat=lat,
+                    lon=lon,
+                    type=cam_type,
+                    speed_limit=parse_limit(row.get("速限")),
+                    bearing=bearing,
+                    city=city if city is not None else (row.get("縣市") or "").strip(),
+                    description=description,
+                    source=source,
+                    last_seen=today,
+                )
             )
-        )
     return cameras, unresolved, stats
 
 
@@ -785,3 +826,46 @@ def parse_178121(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
             )
         )
     return cameras, unresolved, stats
+
+
+def parse_83881(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Taichung fixed enforcement (臺中市科學儀器執法設備取締地點(固定式)): the
+    police's own list of every fixed device — 224 rows in 2026-10 against the
+    176 Taichung rows of the national set, which lacks the city's red-light
+    cameras entirely. County-standard columns without 縣市; 拍攝方向 uses the
+    four cardinal 北往南-style values and 雙向. Rows listing 超速 stay `fixed`
+    so they dedupe against their 7320 twins (geocodes differ by up to ~120 m,
+    see dedupe.CROSS_SOURCE_DIRECTED_RADIUS_M)."""
+    return _parse_county_standard(text, today, SOURCE_83881, ("設置地點",), ("取締項目",), city="臺中市")
+
+
+def parse_27969(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Changhua fixed speed and red-light cameras (彰化縣警察局固定式取締違規照相
+    設備設置地點一覽表): county-standard columns; 設置地點 carries non-breaking
+    spaces that strip() removes."""
+    return _parse_county_standard(text, today, SOURCE_27969, ("設置地點",), ("取締項目",))
+
+
+def _parse_hsinchu_county(text: str, today: str, source: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """新竹縣 publishes bare 緯度/經度 columns and a 種類 column; junction
+    devices carry 拍攝方向 '路口' (no direction → alert both ways) and 速限 '—'."""
+    return _parse_county_standard(text, today, source, ("設置地點",), ("取締項目",))
+
+
+def parse_109336(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Hsinchu County junction enforcement (新竹縣政府警察局固定式科學儀器執法設備設置地點)."""
+    return _parse_hsinchu_county(text, today, SOURCE_109336)
+
+
+def parse_173211(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Hsinchu County fixed speed cameras (新竹縣政府警察局固定測速設置地點)."""
+    return _parse_hsinchu_county(text, today, SOURCE_173211)
+
+
+def parse_178734(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Taitung (臺東縣警察局取締違規照相設備暨科技執法偵測設置地點一覽表): three
+    Big5 files behind one resource URL (fixed, tech, 區間), Keelung-style
+    suffixed columns, 座標緯度/座標經度 holding each other's values
+    (normalize_coords un-swaps them). The 區間 rows list both gantries as
+    "lat1,lat2" and are excluded as sections (curated in sections.yaml)."""
+    return _parse_county_standard(text, today, SOURCE_178734, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)

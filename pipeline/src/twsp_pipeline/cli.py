@@ -11,7 +11,7 @@ from pathlib import Path
 from .decode import decode_bytes
 from .dedupe import collapse_id_duplicates, dedupe
 from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
-from .fetch import FetchError, download, extract_csv_payloads, resolve_csv_url
+from .fetch import FetchError, download, extract_csv_payloads, resolve_csv_urls
 from .freeway_check import check_freeway_markers
 from .model import Camera, Unresolved
 from .parse import (
@@ -39,6 +39,11 @@ from .parse import (
     SOURCE_178144,
     SOURCE_159972,
     SOURCE_178121,
+    SOURCE_83881,
+    SOURCE_27969,
+    SOURCE_109336,
+    SOURCE_173211,
+    SOURCE_178734,
     parse_130111,
     parse_13940,
     parse_156415,
@@ -63,6 +68,11 @@ from .parse import (
     parse_178144,
     parse_159972,
     parse_178121,
+    parse_83881,
+    parse_27969,
+    parse_109336,
+    parse_173211,
+    parse_178734,
 )
 from .sections import load_sections, suppress_section_hint_points
 
@@ -71,7 +81,9 @@ from .sections import load_sections, suppress_section_hint_points
 # municipal sets richest-metadata first — 130111 before 135957 so Taipei
 # red-light twins keep bearing and speed limit, 25935 before 178168 so Taoyuan
 # speed twins keep their equipment ids, 176549 before the other Kaohsiung sets
-# for the same reason.
+# for the same reason, 83881 (bearing + limit) before Taichung's bearingless
+# tech list 170673, 27969 (speed + red-light) before 彰化's tech list 172905,
+# 173211 (speed) before 新竹縣's junction list 109336.
 DATASETS = (
     (13940, parse_13940, SOURCE_13940),
     (7320, parse_7320, SOURCE_7320),
@@ -80,6 +92,7 @@ DATASETS = (
     (25935, parse_25935, SOURCE_25935),
     (178168, parse_178168, SOURCE_178168),
     (135957, parse_135957, SOURCE_135957),
+    (83881, parse_83881, SOURCE_83881),
     (170673, parse_170673, SOURCE_170673),
     (176549, parse_176549, SOURCE_176549),
     (176558, parse_176558, SOURCE_176558),
@@ -87,6 +100,7 @@ DATASETS = (
     (176561, parse_176561, SOURCE_176561),
     (176555, parse_176555, SOURCE_176555),
     (177827, parse_177827, SOURCE_177827),
+    (27969, parse_27969, SOURCE_27969),
     (172905, parse_172905, SOURCE_172905),
     (178085, parse_178085, SOURCE_178085),
     (178086, parse_178086, SOURCE_178086),
@@ -96,7 +110,10 @@ DATASETS = (
     (172174, parse_172174, SOURCE_172174),
     (159972, parse_159972, SOURCE_159972),
     (178144, parse_178144, SOURCE_178144),
+    (173211, parse_173211, SOURCE_173211),
+    (109336, parse_109336, SOURCE_109336),
     (178121, parse_178121, SOURCE_178121),
+    (178734, parse_178734, SOURCE_178734),
 )
 
 
@@ -123,18 +140,27 @@ def load_previous_snapshot(db_path: Path, source: str) -> list[Camera] | None:
 
 
 def _fetch_texts(dataset_id: int, cache_dir: Path | None) -> list[str]:
+    """Decoded CSV texts of every resource file the dataset publishes. Cached
+    as one ZIP-free blob per URL (<id>.bin, <id>.1.bin, …)."""
     cache_file = cache_dir / f"{dataset_id}.bin" if cache_dir else None
     if cache_file and cache_file.exists():
-        raw = cache_file.read_bytes()
-        print(f"  using cached download: {cache_file}")
+        raws = [cache_file.read_bytes()]
+        extra = 1
+        while (more := cache_file.with_name(f"{dataset_id}.{extra}.bin")).exists():
+            raws.append(more.read_bytes())
+            extra += 1
+        print(f"  using cached download: {cache_file} (+{len(raws) - 1})")
     else:
-        url = resolve_csv_url(dataset_id)
-        print(f"  resolved URL: {url}")
-        raw = download(url)
-        if cache_file:
-            cache_file.parent.mkdir(parents=True, exist_ok=True)
-            cache_file.write_bytes(raw)
-    return [decode_bytes(payload) for payload in extract_csv_payloads(raw)]
+        raws = []
+        for index, url in enumerate(resolve_csv_urls(dataset_id)):
+            print(f"  resolved URL: {url}")
+            raw = download(url)
+            raws.append(raw)
+            if cache_file:
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                target = cache_file if index == 0 else cache_file.with_name(f"{dataset_id}.{index}.bin")
+                target.write_bytes(raw)
+    return [decode_bytes(payload) for raw in raws for payload in extract_csv_payloads(raw)]
 
 
 def main(argv: list[str] | None = None) -> int:

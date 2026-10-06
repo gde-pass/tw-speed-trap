@@ -115,15 +115,13 @@ object BubbleOverlayController {
         present: Boolean,
     ) {
         // canDrawOverlays is a binder round-trip to AppOps; at 1 Hz status
-        // updates it is only worth asking when the answer could matter.
+        // updates it is only worth asking when the answer could matter: the
+        // bubble is wanted and not up yet. An attached bubble keeps its
+        // permission (revoking it tears the window down system-side, and
+        // OverlayBubble guards every WindowManager call).
         val wanted = settings.overlayBubbleEnabled && (present || status.running)
-        val show =
-            shouldShow(
-                settings.overlayBubbleEnabled,
-                present,
-                status.running,
-                wanted && Settings.canDrawOverlays(app),
-            )
+        val canDraw = wanted && (bubble != null || Settings.canDrawOverlays(app))
+        val show = shouldShow(settings.overlayBubbleEnabled, present, status.running, canDraw)
         if (!show) {
             bubble?.detach()
             bubble = null

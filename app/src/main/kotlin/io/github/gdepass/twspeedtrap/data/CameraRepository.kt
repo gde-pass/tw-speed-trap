@@ -27,7 +27,9 @@ class CameraRepository(
 
     fun ensureDatabase(): File {
         val file = databaseFile()
-        if (!file.exists()) copyBundled(file) else refreshFromBundledOnce(file)
+        synchronized(installLock) {
+            if (!file.exists()) copyBundled(file) else refreshFromBundledOnce(file)
+        }
         return file
     }
 
@@ -41,7 +43,7 @@ class CameraRepository(
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val versionCode = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
         if (prefs.getLong(KEY_CHECKED_VERSION, -1L) == versionCode) return
-        val tmp = File(local.parentFile, "${local.name}.asset-tmp")
+        val tmp = File.createTempFile("$DB_NAME.asset-", ".tmp", local.parentFile)
         runCatching {
             copyBundledTo(tmp)
             val bundledVersion = readVersionOf(tmp)
@@ -50,9 +52,12 @@ class CameraRepository(
                 Log.i(TAG, "bundled data $bundledVersion is newer than local $localVersion — replacing")
                 check(tmp.renameTo(local)) { "could not replace $DB_NAME with the bundled copy" }
             }
+        }.onSuccess {
+            // Only a completed check is remembered: a failed one (low storage
+            // on first launch) must run again next start, not next version.
+            prefs.edit().putLong(KEY_CHECKED_VERSION, versionCode).apply()
         }.onFailure { Log.w(TAG, "bundled-data refresh check failed", it) }
         tmp.delete()
-        prefs.edit().putLong(KEY_CHECKED_VERSION, versionCode).apply()
     }
 
     private fun readVersionOf(file: File): String =
@@ -64,7 +69,8 @@ class CameraRepository(
 
     /** tmp + fsync + rename: the final path never holds a partial file. */
     private fun copyBundled(target: File) {
-        val tmp = File(target.parentFile, "${target.name}.asset-tmp")
+        target.parentFile?.mkdirs()
+        val tmp = File.createTempFile("$DB_NAME.asset-", ".tmp", target.parentFile)
         copyBundledTo(tmp)
         check(tmp.renameTo(target)) { "could not install bundled $DB_NAME" }
     }
@@ -116,10 +122,12 @@ class CameraRepository(
             openReadOnly().use(block)
         } catch (e: SQLiteException) {
             Log.e(TAG, "camera database unreadable — restoring the bundled copy", e)
-            val file = databaseFile()
-            file.delete()
-            File(file.parentFile, "${file.name}-journal").delete()
-            copyBundled(file)
+            synchronized(installLock) {
+                val file = databaseFile()
+                file.delete()
+                File(file.parentFile, "${file.name}-journal").delete()
+                copyBundled(file)
+            }
             openReadOnly().use(block)
         }
 
@@ -167,6 +175,11 @@ class CameraRepository(
         SQLiteDatabase.openDatabase(ensureDatabase().path, null, SQLiteDatabase.OPEN_READONLY)
 
     companion object {
+        /** Service load, map, settings and the worker can all install the
+         * bundled copy at once; one process-wide lock keeps them from racing
+         * on the same final path. */
+        private val installLock = Any()
+
         const val DB_NAME = "cameras.db"
         private const val TAG = "CameraRepository"
         private const val PREFS = "camera_db"

@@ -234,6 +234,28 @@ sections:
 #       (40); 台62甲 3號隧道→東海街 (50, 25.124674,121.77938) — all single
 #       witness coordinate, no independent anchors yet.
 #
+# From the 2026-10 catalog sweep (keyword blind spot 區間平均速率 / 違規照相):
+#  新北 126156 — 14 rows with START AND END coordinates for each direction
+#       (台9 北宜 19K→23.1K / 26.2K→32.2K / 33.3K→37.2K, 台64, 台65, 台2, …,
+#       official length per direction). Pair-given quality; still needs the
+#       local bearing at each gantry (the chord bearing is useless on 北宜's
+#       hairpins) — walk OSM between the two given points before enabling.
+#  苗栗 178412 — 14 rows, one coordinate each: 台61 122.6→115.6K & 122.2→130.2K
+#       (already curated above from 7320), 台13甲 8.3→9.5K & 9.8→11K (60),
+#       縣140, 台3, 台6 … (row 2 has lon 122.6769237: a typo for 120.67).
+#  南投 171261 — 臺21 53.8↔51.1K both directions share one coordinate
+#       (23.94172,120.929131), lengths 2729.2 / 2800.3 m.
+#  新竹縣 172950 — 台3 82.2→84.3K (24.703494,121.047095, 60) and 台15 鳳鼻尾隧道
+#       66.3→69.5K (24.877896,120.954688, 60), 雙向, one coordinate each.
+#  彰化 178161 — 台61 南向北 177→168.1K (24.081824,120.420383, 90).
+#  雲林 144355 — 台61 南下 218.25→226.25K (23.774952,120.27286, 90) + northbound twin.
+#  高雄 176559 — 松藝路 both directions (22.669723,120.343016 / 22.659094,
+#       120.340722, 50, ~1.3 km) and 市道182 28.9→31.8K (22.924803,120.421616).
+#  臺東 178734 — gives both gantries of the two zones curated above:
+#       臺11線 小馬 (23.007769,121.323528)↔(22.980172,121.309662) and 臺9戊
+#       壽卡 (22.2779495,120.8645642)↔(22.254910,120.841083), within ~25 m of
+#       the curated points; use them as the cross-check when revisiting.
+#
 # From the 2026-08 county sweep (datasets 144579 屏東, 100857 雪山隧道 —
 # both publish descriptions/km-markers only, no coordinates):
 #  台1  戰備跑道 429.5K→433K 南向 / 433K→429.5K 北向 (limit 70) — 屏東

@@ -49,10 +49,16 @@ class Announcer(
 
     private var ready = false
 
+    /** The engine refused to bind: nothing will ever be spoken by this instance. */
+    private var bindFailed = false
+
     @Volatile
     private var released = false
-    private var pending: Pair<String, Boolean>? = null
+
+    /** Alerts queued while the engine binds (or rebinds), oldest first. */
+    private val pending = ArrayDeque<Pair<String, Boolean>>()
     private var utteranceSeq = 0
+    private var rebuilding = false
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -92,7 +98,9 @@ class Announcer(
     var voiceMissing = false
         private set
 
-    private val tts: TextToSpeech =
+    private var tts: TextToSpeech = createEngine()
+
+    private fun createEngine(): TextToSpeech =
         TextToSpeech(context) { status ->
             if (released) {
                 // Engine bound after a quick start→stop: a shut-down engine
@@ -104,10 +112,35 @@ class Announcer(
             } else {
                 // Engine failed to bind: every speak() would be silently
                 // swallowed. Surface it as the voice-missing warning.
+                bindFailed = true
+                rebuilding = false
                 voiceMissing = true
                 onVoiceStatus(true)
             }
         }
+
+    /**
+     * The engine's service went away mid-ride (voice app updated by the
+     * store, killed for memory): the bound instance never recovers and every
+     * speak() returns ERROR from then on. Replace it, keep the alert that
+     * exposed the loss, and show the voice warning until the new one speaks.
+     */
+    private fun rebuildEngine(
+        text: String,
+        chime: Boolean,
+    ) {
+        pending.addLast(text to chime)
+        if (rebuilding) return
+        Log.w(TAG, "TTS engine rejected an utterance — rebinding the engine")
+        rebuilding = true
+        ready = false
+        voiceMissing = true
+        onVoiceStatus(true)
+        ledger.forceRelease()
+        handler.removeCallbacks(backstop)
+        runCatching { tts.shutdown() }
+        tts = createEngine()
+    }
 
     private fun onInitialized() {
         val result = tts.setLanguage(locale)
@@ -139,37 +172,56 @@ class Announcer(
             },
         )
         ready = true
-        pending?.let { (text, chime) -> speak(text, chime) }
-        pending = null
+        rebuilding = false
+        bindFailed = false
+        while (pending.isNotEmpty()) {
+            val (text, chime) = pending.removeFirst()
+            speak(text, chime)
+        }
     }
 
+    /**
+     * Speaks [text]. An [urgent] announcement (a camera ahead) flushes
+     * whatever is still queued — a section summary or an all-clear tone must
+     * not hold a camera alert back for seconds while the camera closes in.
+     */
     fun speak(
         text: String,
         chime: Boolean = false,
+        urgent: Boolean = false,
     ) {
+        if (bindFailed) return
         if (!ready) {
-            // TTS engines take a moment to bind; keep the most recent alert.
-            pending = text to chime
+            // TTS engines take a moment to bind; keep every alert, in order.
+            pending.addLast(text to chime)
             return
         }
         // The ledger ignores requestAudioFocus's result on purpose: safety
         // alerts must speak even when focus is denied (e.g. during a call),
         // and abandoning a never-granted request is harmless.
         startSeen = false
+        var rejected = false
         val enqueued =
             ledger.announce {
                 buildList {
+                    var mode = if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
                     if (chime) {
                         val chimeId = "twsp-${utteranceSeq++}"
-                        val result = tts.playEarcon(EARCON_CHIME, TextToSpeech.QUEUE_ADD, null, chimeId)
-                        if (result == TextToSpeech.SUCCESS) add(chimeId)
+                        if (tts.playEarcon(EARCON_CHIME, mode, null, chimeId) == TextToSpeech.SUCCESS) add(chimeId)
+                        mode = TextToSpeech.QUEUE_ADD
                     }
                     val utteranceId = "twsp-${utteranceSeq++}"
-                    if (tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId) == TextToSpeech.SUCCESS) {
+                    if (tts.speak(text, mode, null, utteranceId) == TextToSpeech.SUCCESS) {
                         add(utteranceId)
+                    } else {
+                        rejected = true
                     }
                 }
             }
+        if (rejected) {
+            rebuildEngine(text, chime)
+            return
+        }
         if (enqueued) armBackstop()
     }
 
@@ -177,7 +229,7 @@ class Announcer(
      * Deliberately dropped (not queued) while TTS is still binding — an
      * all-clear is only true at the moment it happens. */
     fun playAllClear() {
-        if (!ready) return
+        if (!ready || bindFailed) return
         startSeen = false
         val enqueued =
             ledger.announce {
@@ -208,7 +260,9 @@ class Announcer(
     suspend fun awaitIdle(timeoutMs: Long) {
         val deadline = SystemClock.uptimeMillis() + timeoutMs
         while (SystemClock.uptimeMillis() < deadline) {
-            if (ready && pending == null && !ledger.isHolding) return
+            // An engine that refused to bind will never drain anything.
+            if (bindFailed) return
+            if (ready && pending.isEmpty() && !ledger.isHolding) return
             delay(IDLE_POLL_MS)
         }
         Log.w(TAG, "announcement still playing after ${timeoutMs}ms — not waiting longer")

@@ -30,3 +30,14 @@ CASES = [
 @pytest.mark.parametrize(("text", "expected"), CASES)
 def test_parse_bearing(text, expected):
     assert parse_bearing(text) == expected
+
+
+def test_from_to_text_is_read_from_the_approach_side():
+    # Straight movements: the "to" side equals the opposite of the "from" side.
+    assert parse_bearing("北向南") == 180.0
+    assert parse_bearing("西往東") == 90.0
+    assert parse_bearing("東北向西南") == 225.0
+    # Turn movements (Kaohsiung 違規左轉 cameras): the rider approaches from the
+    # west heading east; the camera must alert eastbound riders, not northbound.
+    assert parse_bearing("西往北") == 90.0
+    assert parse_bearing("北往西") == 180.0

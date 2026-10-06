@@ -144,3 +144,29 @@ def test_section_endpoints_never_cross_type_merge():
     b = cam("b", BASE_LAT, BASE_LON, type_="section", source="curated:sections.yaml")
     kept, _ = dedupe([a, b])
     assert len(kept) == 2
+
+
+DEG_100M_LAT = 100 / 110_540
+
+
+def test_directed_cross_source_twins_merge_up_to_120m():
+    # 臺中 83881 and 7320 describe the same pole word for word up to ~120 m
+    # apart; both carry the same bearing, so they cannot be a junction's
+    # opposite-direction twin.
+    a = cam("a", BASE_LAT, BASE_LON, bearing=180.0, source="gov.tw:7320")
+    b = cam("b", BASE_LAT + DEG_100M_LAT, BASE_LON, bearing=180.0, source="gov.tw:83881")
+    kept, dropped = dedupe([a, b])
+    assert [c.id for c in kept] == ["a"]
+    assert dropped["gov.tw:83881->gov.tw:7320"] == 1
+
+
+def test_wide_radius_needs_a_bearing_on_both_sides():
+    # A 雙向 row 100 m from a directed one is kept: merging would narrow it.
+    a = cam("a", BASE_LAT, BASE_LON, bearing=180.0, source="gov.tw:7320")
+    b = cam("b", BASE_LAT + DEG_100M_LAT, BASE_LON, bearing=None, source="gov.tw:83881")
+    kept, _ = dedupe([a, b])
+    assert len(kept) == 2
+    # Disagreeing bearings 100 m apart are two devices.
+    c = cam("c", BASE_LAT + DEG_100M_LAT, BASE_LON, bearing=90.0, source="gov.tw:83881")
+    kept, _ = dedupe([a, c])
+    assert len(kept) == 2

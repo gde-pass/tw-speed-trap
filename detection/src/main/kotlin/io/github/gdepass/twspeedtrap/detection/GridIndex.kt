@@ -11,6 +11,9 @@ class GridIndex(
     cameras: List<Camera>,
 ) {
     private val cells: Map<Long, List<Camera>> = cameras.groupBy { key(cellOf(it.lat), cellOf(it.lon)) }
+    private val byId: Map<String, Camera> = cameras.associateBy { it.id }
+
+    fun byId(id: String): Camera? = byId[id]
 
     fun near(
         lat: Double,

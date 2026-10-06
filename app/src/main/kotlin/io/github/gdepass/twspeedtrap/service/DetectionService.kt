@@ -74,7 +74,9 @@ class DetectionService : LifecycleService() {
     private fun startDetection() {
         // Every start request must reach startForeground, including redundant
         // ones while already running (Bluetooth auto-start, notification tap).
-        if (!startForegroundOrDegrade()) return
+        // A redundant one that gets refused is logged and ignored: the ride
+        // already running must not be torn down by a reconnecting intercom.
+        if (!startForegroundOrDegrade(alreadyRunning = detectionJob != null)) return
         // A start that succeeded supersedes any "tap to start" or failure
         // notification still on the shade.
         getSystemService(NotificationManager::class.java).apply {
@@ -103,7 +105,7 @@ class DetectionService : LifecycleService() {
      * a SecurityException here, which must never take the process down (the
      * Bluetooth auto-start receiver reaches this from a cold background
      * start). Degrade to the tap-to-start notification instead of crashing. */
-    private fun startForegroundOrDegrade(): Boolean =
+    private fun startForegroundOrDegrade(alreadyRunning: Boolean): Boolean =
         try {
             ServiceCompat.startForeground(
                 this,
@@ -113,12 +115,23 @@ class DetectionService : LifecycleService() {
             )
             true
         } catch (e: SecurityException) {
-            degradeToTapToStart(e)
+            refuseStart(e, alreadyRunning)
             false
         } catch (e: IllegalStateException) {
-            degradeToTapToStart(e)
+            refuseStart(e, alreadyRunning)
             false
         }
+
+    private fun refuseStart(
+        e: Exception,
+        alreadyRunning: Boolean,
+    ) {
+        if (alreadyRunning) {
+            Log.w(TAG, "redundant start refused while detection is running — ignoring", e)
+        } else {
+            degradeToTapToStart(e)
+        }
+    }
 
     private fun degradeToTapToStart(e: Exception) {
         Log.e(TAG, "startForeground rejected, degrading to tap-to-start", e)
@@ -238,7 +251,7 @@ class DetectionService : LifecycleService() {
         getSystemService(NotificationManager::class.java).notify(
             FAILURE_NOTIFICATION_ID,
             NotificationCompat
-                .Builder(this, CHANNEL_ID)
+                .Builder(this, ATTENTION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(localized.getString(R.string.notif_title))
                 .setContentText(text)
@@ -298,7 +311,7 @@ class DetectionService : LifecycleService() {
             text = localized.getString(R.string.alert_with_warning, text)
         }
         Log.i(TAG, "alert: $text (${event.camera.id} at ${event.distanceM.roundToInt()} m)")
-        announcer?.speak(text, chimeEnabled)
+        announcer?.speak(text, chimeEnabled, urgent = true)
     }
 
     private fun stopDetection() {
@@ -359,13 +372,24 @@ class DetectionService : LifecycleService() {
     }
 
     private fun createNotificationChannel() {
-        val channel =
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.notif_channel_name),
                 NotificationManager.IMPORTANCE_LOW,
-            )
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            ),
+        )
+        // The silent status channel is right for the per-second ride
+        // notification and wrong for the one message that must interrupt:
+        // detection died and the rider believes they are still protected.
+        manager.createNotificationChannel(
+            NotificationChannel(
+                ATTENTION_CHANNEL_ID,
+                getString(R.string.notif_attention_channel),
+                NotificationManager.IMPORTANCE_HIGH,
+            ),
+        )
     }
 
     // The intents are constant, so the PendingIntents can be created once per
@@ -423,6 +447,7 @@ class DetectionService : LifecycleService() {
         const val ACTION_STOP = "io.github.gdepass.twspeedtrap.STOP"
         private const val TAG = "DetectionService"
         private const val CHANNEL_ID = "detection"
+        private const val ATTENTION_CHANNEL_ID = "detection-attention"
         private const val NOTIFICATION_ID = 1
         private const val FAILURE_NOTIFICATION_ID = 3
 

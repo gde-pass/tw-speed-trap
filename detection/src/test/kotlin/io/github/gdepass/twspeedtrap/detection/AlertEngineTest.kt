@@ -439,5 +439,39 @@ class AlertEngineTest {
         AlertEngine(listOf(camera), EngineConfig(alertDistanceM = 600.0, highSpeedAlertDistanceM = 600.0))
     }
 
+    @Test
+    fun `a camera on a diagonal road tagged with a cardinal direction still alerts`() {
+        // Source data carries only 北往南-style directions: this southbound-tagged
+        // camera sits on a road running 235°, and the heading reads 10° noisier.
+        val engine = AlertEngine(listOf(camera))
+        val upstream = fix(camera.lat + 180 * degPerMeterLat, lon = camera.lon + 180 * degPerMeterLon, bearing = 235.0)
+        assertEquals(
+            1,
+            engine.onFix(upstream).size,
+            "a 55° skew between road and cardinal tag must not silence the camera",
+        )
+        // Cross traffic through the camera's junction (90° off, camera dead ahead) is still rejected.
+        val cross = AlertEngine(listOf(camera))
+        assertTrue(cross.onFix(fix(camera.lat, lon = camera.lon + 250 * degPerMeterLon, bearing = 270.0)).isEmpty())
+    }
+
+    @Test
+    fun `a camera left behind in one jump re-arms and fires on the way back`() {
+        val both = camera.copy(id = "any", bearingDeg = null)
+        val engine = AlertEngine(listOf(both))
+        assertEquals(1, engine.onFix(fix(both.lat + 250 * degPerMeterLat, timeMs = 0L)).size)
+        // Tunnel: the next fix is 3 km south, far outside the index cells around
+        // the camera (only the pending pass is forgotten there).
+        val gap = engine.onFix(fix(both.lat - 3_000 * degPerMeterLat, timeMs = 60_000L))
+        assertTrue(gap.none { it is AlertEvent.CameraAhead })
+        // Back the same way, approaching northbound from 250 m south: must fire again.
+        val back = engine.onFix(fix(both.lat - 250 * degPerMeterLat, bearing = 0.0, timeMs = 120_000L))
+        assertEquals(
+            1,
+            back.filterIsInstance<AlertEvent.CameraAhead>().size,
+            "disarmed must not outlive a gap in the index",
+        )
+    }
+
     private val degPerMeterLon = 1.0 / 101_560.0
 }

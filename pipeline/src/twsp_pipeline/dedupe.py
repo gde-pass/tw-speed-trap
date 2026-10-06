@@ -10,7 +10,10 @@ priority (richest data first). Rules, all requiring compatible bearings:
   one pole twice with GPS jitter);
 - same type, different sources: duplicates within CROSS_SOURCE_RADIUS_M —
   two agencies geocoding the same device disagree by more than one agency's
-  own jitter;
+  own jitter; when both rows carry a bearing (and they agree) the radius
+  widens to CROSS_SOURCE_DIRECTED_RADIUS_M: 臺中 83881 and 7320 describe the
+  same pole word for word up to ~120 m apart (21 of 224 rows in 2026-10),
+  and a directed twin cannot be the opposite-direction device of a junction;
 - different types (fixed/red_light/tech only), different sources: duplicates
   within CROSS_TYPE_RADIUS_M — tight, because nearby distinct devices of
   different types genuinely exist at intersections.
@@ -27,8 +30,9 @@ from .model import Camera
 
 RADIUS_M = 30.0
 CROSS_SOURCE_RADIUS_M = 45.0
+CROSS_SOURCE_DIRECTED_RADIUS_M = 120.0
 CROSS_TYPE_RADIUS_M = 15.0
-_CELL_DEG = 0.0005  # ~50 m; guarantees a 45 m neighbour is within the 3x3 block
+_CELL_DEG = 0.0012  # ~120 m at 24°N; guarantees a 120 m neighbour is within the 3x3 block
 
 _M_PER_DEG_LAT = 110_540.0
 _M_PER_DEG_LON_EQ = 111_320.0
@@ -56,7 +60,12 @@ def _duplicate_kind(cam: Camera, kept: Camera) -> str | None:
         return None
     distance = _distance_m(cam, kept)
     if cam.type == kept.type:
-        limit = RADIUS_M if cam.source == kept.source else CROSS_SOURCE_RADIUS_M
+        if cam.source == kept.source:
+            limit = RADIUS_M
+        elif cam.bearing is not None and kept.bearing is not None:
+            limit = CROSS_SOURCE_DIRECTED_RADIUS_M
+        else:
+            limit = CROSS_SOURCE_RADIUS_M
         return "same_type" if distance <= limit else None
     if (
         cam.source != kept.source

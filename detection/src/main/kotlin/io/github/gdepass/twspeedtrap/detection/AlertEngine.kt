@@ -9,7 +9,13 @@ data class EngineConfig(
     val alertDistanceM: Double = 300.0,
     /** Alerts fire this many metres before the camera at highway speed. */
     val highSpeedAlertDistanceM: Double = 500.0,
-    val bearingToleranceDeg: Double = 45.0,
+    /**
+     * Heading-vs-enforced-direction tolerance. Source datasets give only the
+     * four cardinal directions, so a camera on a diagonal road is tagged up
+     * to 45° off its true axis; add GPS heading noise and 45° flickered on
+     * Taichung's skewed arterials. 60° still rejects cross traffic (90°).
+     */
+    val bearingToleranceDeg: Double = 60.0,
     /** Below this speed GPS bearing is noise; skip the bearing filter. */
     val minSpeedForBearingMps: Double = 15.0 / 3.6,
     val speedToleranceKmh: Double = 10.0,
@@ -98,9 +104,27 @@ class AlertEngine(
             if (nearest == null || distance < nearest.second) nearest = camera to distance
         }
         nearestCamera = nearest
+        sweepDisarmed(fix)
         trackActiveAlert(fix, events)
         if (sectionsEnabled) events.addAll(sectionTracker.onFix(fix))
         return events
+    }
+
+    /**
+     * Re-arms fired cameras the index no longer returns. [evaluate] re-arms
+     * only cameras within the index coverage, so a camera left behind in one
+     * jump (tunnel, GPS outage, a 1 km gap between fixes) would otherwise
+     * stay disarmed for the rest of the ride and never fire on the way back.
+     */
+    private fun sweepDisarmed(fix: Fix) {
+        if (disarmed.isEmpty()) return
+        val iterator = disarmed.entries.iterator()
+        while (iterator.hasNext()) {
+            val (id, firedRingM) = iterator.next()
+            val camera = index.byId(id) ?: continue
+            val distance = GeoMath.distanceMeters(fix.lat, fix.lon, camera.lat, camera.lon)
+            if (distance > firedRingM * config.rearmFactor) iterator.remove()
+        }
     }
 
     /** Keeps [activeAlert] on the nearest fired-but-not-passed camera and emits

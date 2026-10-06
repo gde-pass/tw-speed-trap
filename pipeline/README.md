@@ -21,6 +21,8 @@ they change over time):
   Taoyuan speed and red-light cameras
 - [178168](https://data.gov.tw/dataset/178168) 桃園市科技執法設備地點 —
   Taoyuan tech enforcement
+- [83881](https://data.gov.tw/dataset/83881) 臺中市科學儀器執法設備取締地點(固定式) —
+  Taichung police fixed cameras (speed + red-light, with bearing and limit)
 - [170673](https://data.gov.tw/dataset/170673) 臺中市科技執法取締地點 —
   Taichung tech enforcement
 - Kaohsiung 115年 series (files on data.kcg.gov.tw, unreachable from GitHub
@@ -32,7 +34,8 @@ they change over time):
   [176560](https://data.gov.tw/dataset/176560) 捷運局輕軌沿線,
   [176561](https://data.gov.tw/dataset/176561) 路口科技執法監測系統,
   [177827](https://data.gov.tw/dataset/177827) 租賃式車不停讓行人
-- County sets: [172905](https://data.gov.tw/dataset/172905) 彰化,
+- County sets: [27969](https://data.gov.tw/dataset/27969) /
+  [172905](https://data.gov.tw/dataset/172905) 彰化,
   [178085](https://data.gov.tw/dataset/178085) /
   [178086](https://data.gov.tw/dataset/178086) 雲林,
   [178159](https://data.gov.tw/dataset/178159) 基隆,
@@ -41,7 +44,11 @@ they change over time):
   [172174](https://data.gov.tw/dataset/172174) 苗栗,
   [159972](https://data.gov.tw/dataset/159972) 屏東,
   [178144](https://data.gov.tw/dataset/178144) 新竹市,
-  [178121](https://data.gov.tw/dataset/178121) 金門
+  [173211](https://data.gov.tw/dataset/173211) /
+  [109336](https://data.gov.tw/dataset/109336) 新竹縣,
+  [178121](https://data.gov.tw/dataset/178121) 金門,
+  [178734](https://data.gov.tw/dataset/178734) 臺東 (three Big5 files behind
+  one resource URL)
 
 Average-speed (區間測速) rows in any source are excluded from point import —
 sections are hand-curated in `data/sections.yaml` with entry/exit pairs.
