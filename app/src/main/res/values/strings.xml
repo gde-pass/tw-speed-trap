@@ -113,4 +113,8 @@
     <string name="about_license">The app code is open source under the MIT license.</string>
     <string name="about_osm">Map tiles © OpenStreetMap contributors.</string>
     <string name="about_repo">Source code on GitHub</string>
+    <string name="perm_open_settings">Open app settings</string>
+    <string name="perm_denied_hint">Android no longer shows the permission dialog. Grant it from the app’s settings page.</string>
+    <string name="gps_lost_warning">GPS signal lost — no alerts!</string>
+    <string name="no_app_for_action">No app on this phone can open that screen.</string>
 </resources>

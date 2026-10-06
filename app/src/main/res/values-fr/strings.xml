@@ -111,4 +111,8 @@
     <string name="about_license">Le code de l’application est open source sous licence MIT.</string>
     <string name="about_osm">Fonds de carte © les contributeurs d’OpenStreetMap.</string>
     <string name="about_repo">Code source sur GitHub</string>
+    <string name="perm_open_settings">Ouvrir les réglages de l’appli</string>
+    <string name="perm_denied_hint">Android n’affiche plus la demande de permission. Accordez-la depuis la page de réglages de l’appli.</string>
+    <string name="gps_lost_warning">Signal GPS perdu — aucune alerte !</string>
+    <string name="no_app_for_action">Aucune appli sur ce téléphone ne peut ouvrir cet écran.</string>
 </resources>

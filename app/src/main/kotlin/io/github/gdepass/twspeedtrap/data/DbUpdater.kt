@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.Buffer
 import java.io.File
+import java.io.FileOutputStream
 
 sealed interface UpdateResult {
     data class Updated(
@@ -63,7 +64,9 @@ class DbUpdater(
         if (!UpdateVerifier.isTrustedUrl(manifest.url)) {
             return UpdateResult.Failed("untrusted database URL")
         }
-        val localVersion = repository.metadata()["data_version"]
+        // An unreadable local file (the repository restores the bundled copy
+        // on read) must not block the download that would replace it.
+        val localVersion = runCatching { repository.metadata()["data_version"] }.getOrNull()
         if (!UpdateVerifier.isNewer(manifest.dataVersion, localVersion)) return UpdateResult.UpToDate
 
         val dbBytes = fetch(manifest.url, MAX_DB_BYTES) ?: return UpdateResult.Failed("database download failed")
@@ -74,7 +77,12 @@ class DbUpdater(
         val target = repository.databaseFile()
         val tmp = File(target.parentFile, "${target.name}.tmp")
         tmp.delete() // orphan from an earlier crashed attempt
-        tmp.writeBytes(dbBytes)
+        // fsync before the rename: on ext4/f2fs the rename can be journaled
+        // before the data blocks, and a power loss then leaves an empty db.
+        FileOutputStream(tmp).use { out ->
+            out.write(dbBytes)
+            out.fd.sync()
+        }
         if (!sqliteValid(tmp, manifest)) {
             tmp.delete()
             return UpdateResult.Failed("downloaded database failed validation")

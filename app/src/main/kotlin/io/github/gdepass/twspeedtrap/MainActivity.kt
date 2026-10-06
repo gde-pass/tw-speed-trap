@@ -22,7 +22,10 @@ import kotlinx.coroutines.runBlocking
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
         // Apply the app-language override before any resources are resolved.
-        val tag = runBlocking { SettingsRepository(newBase).settings.first().languageTag }
+        val tag =
+            SettingsRepository.cachedLanguageTag(newBase) {
+                runBlocking { SettingsRepository(newBase).settings.first().languageTag }
+            }
         super.attachBaseContext(LocaleOverride.wrap(newBase, tag))
     }
 

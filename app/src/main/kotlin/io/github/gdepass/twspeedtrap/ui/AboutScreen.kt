@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.data.CameraRepository
+import io.github.gdepass.twspeedtrap.util.startActivitySafely
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -93,7 +94,7 @@ fun AboutScreen(onBack: () -> Unit) {
             // Attribution required by 政府資料開放授權條款第1版 — keep verbatim.
             Text("資料來源：政府資料開放平臺 (data.gov.tw)", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(10.dp))
-            Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, DATA_LICENSE_URL.toUri())) }) {
+            Button(onClick = { context.startActivitySafely(Intent(Intent.ACTION_VIEW, DATA_LICENSE_URL.toUri())) }) {
                 Text(stringResource(R.string.about_data_license))
             }
 
@@ -107,7 +108,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Text(stringResource(R.string.about_license), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.about_osm), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(10.dp))
-            Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, REPO_URL.toUri())) }) {
+            Button(onClick = { context.startActivitySafely(Intent(Intent.ACTION_VIEW, REPO_URL.toUri())) }) {
                 Text(stringResource(R.string.about_repo))
             }
             Spacer(Modifier.height(24.dp))

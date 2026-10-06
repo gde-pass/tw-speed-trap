@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -46,7 +47,10 @@ class BluetoothAutoStartReceiver : BroadcastReceiver() {
         val pending = goAsync()
         // The timeout keeps the coroutine bounded well inside the ~10 s
         // broadcast window, so nothing outlives the receiver.
-        CoroutineScope(Dispatchers.IO).launch {
+        // A settings read failing here must not crash the process on a
+        // background broadcast; the connect is simply ignored.
+        val crashGuard = CoroutineExceptionHandler { _, e -> Log.e(TAG, "auto-start failed", e) }
+        CoroutineScope(Dispatchers.IO + crashGuard).launch {
             try {
                 val settings =
                     withTimeoutOrNull(SETTINGS_TIMEOUT_MS) {

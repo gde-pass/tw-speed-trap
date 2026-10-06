@@ -11,9 +11,11 @@ import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import io.github.gdepass.twspeedtrap.data.AppSettings
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -50,15 +52,41 @@ object BubbleOverlayController {
         // Main.immediate: every bubble mutation is a WindowManager call.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val repository = SettingsRepository(app)
-        scope.launch {
-            combine(
-                repository.settings,
-                DetectionStatus.state,
-                permissionRecheck,
-                userPresent,
-            ) { settings, status, _, present ->
-                Triple(settings, status, present)
-            }.collect { (settings, status, present) -> apply(app, scope, repository, settings, status, present) }
+        scope.launch { collectForever(app, scope, repository) }
+    }
+
+    /**
+     * The one collector that can ever take the bubble down. If it died — a
+     * WindowManager call refused because the system already pulled the
+     * window, a settings read that threw — an attached bubble would be
+     * unremovable for the life of the process, pinning it at perceptible
+     * priority. So a failure detaches whatever is up and the collection
+     * restarts; it never ends.
+     */
+    @Suppress("TooGenericExceptionCaught") // anything escaping here orphans the bubble
+    private suspend fun collectForever(
+        app: Application,
+        scope: CoroutineScope,
+        repository: SettingsRepository,
+    ) {
+        while (true) {
+            try {
+                combine(
+                    repository.settings,
+                    DetectionStatus.state,
+                    permissionRecheck,
+                    userPresent,
+                ) { settings, status, _, present ->
+                    Triple(settings, status, present)
+                }.collect { (settings, status, present) -> apply(app, scope, repository, settings, status, present) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "bubble collector failed — detaching and restarting", e)
+                bubble?.detach()
+                bubble = null
+                delay(RESTART_DELAY_MS)
+            }
         }
     }
 
@@ -128,6 +156,10 @@ object BubbleOverlayController {
         } catch (e: IllegalStateException) {
             Log.e(TAG, "overlay attach refused", e)
             null
+        } catch (e: SecurityException) {
+            // Some OEM builds refuse TYPE_APPLICATION_OVERLAY this way.
+            Log.e(TAG, "overlay attach refused", e)
+            null
         }
     }
 
@@ -135,9 +167,10 @@ object BubbleOverlayController {
         when {
             !status.running -> BubbleState.Idle
             // Blind detection must never look protected: location services
-            // off, or not a single GPS fix yet (including a background start
-            // on Android 11–13 where location updates are silently withheld).
-            status.locationOff || status.accuracyM == null -> BubbleState.NoGps
+            // off, not a single GPS fix yet (including a background start on
+            // Android 11–13 where location updates are silently withheld), or
+            // the fixes stopped coming (tunnel, car park).
+            status.locationOff || status.accuracyM == null || status.gpsStale -> BubbleState.NoGps
             status.activeAlert != null ->
                 BubbleState.Alert(
                     status.activeAlert.type,
@@ -203,4 +236,5 @@ object BubbleOverlayController {
     }
 
     private const val TAG = "BubbleOverlay"
+    private const val RESTART_DELAY_MS = 1_000L
 }

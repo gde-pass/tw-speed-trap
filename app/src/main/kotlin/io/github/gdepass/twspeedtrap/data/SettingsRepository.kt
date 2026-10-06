@@ -1,8 +1,10 @@
 package io.github.gdepass.twspeedtrap.data
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -10,9 +12,16 @@ import androidx.datastore.preferences.preferencesDataStore
 import io.github.gdepass.twspeedtrap.detection.CameraType
 import io.github.gdepass.twspeedtrap.detection.EngineConfig
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
-private val Context.dataStore by preferencesDataStore(name = "settings")
+// A corrupt or truncated preferences file (power loss mid-write) must reset
+// to defaults, not crash every launch until the user clears app data.
+private val Context.dataStore by preferencesDataStore(
+    name = "settings",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 data class AppSettings(
     /** Alerts fire this many metres before the camera below 100 km/h. */
@@ -54,31 +63,40 @@ class SettingsRepository(
     private val context: Context,
 ) {
     val settings: Flow<AppSettings> =
-        context.dataStore.data.map { prefs ->
-            AppSettings(
-                alertDistanceM = prefs[KEY_ALERT_DISTANCE] ?: DEFAULTS.alertDistanceM,
-                highSpeedAlertDistanceM = prefs[KEY_ALERT_DISTANCE_HIGH] ?: DEFAULTS.highSpeedAlertDistanceM,
-                speedToleranceKmh = prefs[KEY_SPEED_TOLERANCE] ?: DEFAULTS.speedToleranceKmh,
-                chimeEnabled = prefs[KEY_CHIME] ?: DEFAULTS.chimeEnabled,
-                enabledTypes =
-                    prefs[KEY_ENABLED_TYPES]?.let { names ->
-                        val parsed = names.mapNotNull { name -> CameraType.entries.find { it.name == name } }.toSet()
-                        // A non-empty persisted set that maps to nothing is
-                        // corrupt data, not a choice: fall back to defaults
-                        // rather than silently disabling every alert.
-                        if (parsed.isEmpty() && names.isNotEmpty()) DEFAULTS.enabledTypes else parsed
-                    } ?: DEFAULTS.enabledTypes,
-                languageTag = prefs[KEY_LANGUAGE] ?: DEFAULTS.languageTag,
-                autoUpdateEnabled = prefs[KEY_AUTO_UPDATE] ?: DEFAULTS.autoUpdateEnabled,
-                wifiOnlyUpdates = prefs[KEY_WIFI_ONLY] ?: DEFAULTS.wifiOnlyUpdates,
-                autoStopEnabled = prefs[KEY_AUTO_STOP] ?: DEFAULTS.autoStopEnabled,
-                autoStartBluetoothEnabled = prefs[KEY_AUTO_START_BT] ?: DEFAULTS.autoStartBluetoothEnabled,
-                allClearChimeEnabled = prefs[KEY_ALL_CLEAR_CHIME] ?: DEFAULTS.allClearChimeEnabled,
-                overlayBubbleEnabled = prefs[KEY_OVERLAY_BUBBLE] ?: DEFAULTS.overlayBubbleEnabled,
-                overlayX = prefs[KEY_OVERLAY_X] ?: DEFAULTS.overlayX,
-                overlayY = prefs[KEY_OVERLAY_Y] ?: DEFAULTS.overlayY,
-            )
-        }
+        context.dataStore.data
+            .catch { e ->
+                // Disk read failure: defaults, as DataStore documents, rather
+                // than a dead flow in every collector (bubble, service, UI).
+                if (e is IOException) emit(emptyPreferences()) else throw e
+            }.map { prefs ->
+                AppSettings(
+                    alertDistanceM = prefs[KEY_ALERT_DISTANCE] ?: DEFAULTS.alertDistanceM,
+                    highSpeedAlertDistanceM = prefs[KEY_ALERT_DISTANCE_HIGH] ?: DEFAULTS.highSpeedAlertDistanceM,
+                    speedToleranceKmh = prefs[KEY_SPEED_TOLERANCE] ?: DEFAULTS.speedToleranceKmh,
+                    chimeEnabled = prefs[KEY_CHIME] ?: DEFAULTS.chimeEnabled,
+                    enabledTypes =
+                        prefs[KEY_ENABLED_TYPES]?.let { names ->
+                            val parsed =
+                                names
+                                    .mapNotNull { name ->
+                                        CameraType.entries.find { it.name == name }
+                                    }.toSet()
+                            // A non-empty persisted set that maps to nothing is
+                            // corrupt data, not a choice: fall back to defaults
+                            // rather than silently disabling every alert.
+                            if (parsed.isEmpty() && names.isNotEmpty()) DEFAULTS.enabledTypes else parsed
+                        } ?: DEFAULTS.enabledTypes,
+                    languageTag = prefs[KEY_LANGUAGE] ?: DEFAULTS.languageTag,
+                    autoUpdateEnabled = prefs[KEY_AUTO_UPDATE] ?: DEFAULTS.autoUpdateEnabled,
+                    wifiOnlyUpdates = prefs[KEY_WIFI_ONLY] ?: DEFAULTS.wifiOnlyUpdates,
+                    autoStopEnabled = prefs[KEY_AUTO_STOP] ?: DEFAULTS.autoStopEnabled,
+                    autoStartBluetoothEnabled = prefs[KEY_AUTO_START_BT] ?: DEFAULTS.autoStartBluetoothEnabled,
+                    allClearChimeEnabled = prefs[KEY_ALL_CLEAR_CHIME] ?: DEFAULTS.allClearChimeEnabled,
+                    overlayBubbleEnabled = prefs[KEY_OVERLAY_BUBBLE] ?: DEFAULTS.overlayBubbleEnabled,
+                    overlayX = prefs[KEY_OVERLAY_X] ?: DEFAULTS.overlayX,
+                    overlayY = prefs[KEY_OVERLAY_Y] ?: DEFAULTS.overlayY,
+                )
+            }
 
     suspend fun setAlertDistance(value: Int) = context.dataStore.edit { it[KEY_ALERT_DISTANCE] = value }
 
@@ -91,7 +109,11 @@ class SettingsRepository(
     suspend fun setEnabledTypes(types: Set<CameraType>) =
         context.dataStore.edit { prefs -> prefs[KEY_ENABLED_TYPES] = types.map { it.name }.toSet() }
 
-    suspend fun setLanguageTag(tag: String) = context.dataStore.edit { it[KEY_LANGUAGE] = tag }
+    suspend fun setLanguageTag(tag: String) {
+        // Mirrored so attachBaseContext can read it without blocking on DataStore.
+        languageCache(context).edit().putString(KEY_LANGUAGE.name, tag).apply()
+        context.dataStore.edit { it[KEY_LANGUAGE] = tag }
+    }
 
     suspend fun setAutoUpdateEnabled(value: Boolean) = context.dataStore.edit { it[KEY_AUTO_UPDATE] = value }
 
@@ -115,6 +137,28 @@ class SettingsRepository(
 
     companion object {
         private val DEFAULTS = AppSettings()
+
+        /**
+         * The app-language tag for [android.app.Activity.attachBaseContext],
+         * which runs before any coroutine can: served from a SharedPreferences
+         * mirror; on the first launch after upgrading (no mirror yet) read
+         * once from DataStore and mirrored. Never throws: a broken store means
+         * the system language.
+         */
+        fun cachedLanguageTag(
+            context: Context,
+            readStore: () -> String,
+        ): String {
+            val cache = languageCache(context)
+            cache.getString(KEY_LANGUAGE.name, null)?.let { return it }
+            val tag = runCatching(readStore).getOrDefault(DEFAULTS.languageTag)
+            cache.edit().putString(KEY_LANGUAGE.name, tag).apply()
+            return tag
+        }
+
+        private fun languageCache(context: Context) =
+            context.applicationContext.getSharedPreferences("settings_cache", Context.MODE_PRIVATE)
+
         private val KEY_ALERT_DISTANCE = intPreferencesKey("alert_distance_m")
         private val KEY_ALERT_DISTANCE_HIGH = intPreferencesKey("alert_distance_high_m")
         private val KEY_SPEED_TOLERANCE = intPreferencesKey("speed_tolerance_kmh")

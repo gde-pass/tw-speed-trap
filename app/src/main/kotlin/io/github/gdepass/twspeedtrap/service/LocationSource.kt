@@ -3,6 +3,7 @@ package io.github.gdepass.twspeedtrap.service
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Looper
+import com.google.android.gms.location.LocationAvailability
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -13,14 +14,19 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-/** 1 Hz high-accuracy GPS as a cold [Flow] of [Fix]es. */
+/**
+ * 1 Hz high-accuracy GPS as a cold [Flow] of [Fix]es. [onAvailability]
+ * relays the provider's own availability signal (false in a tunnel or car
+ * park) so blind detection can show as such; a rejected request (no Play
+ * Services, outdated GMS) fails the flow instead of leaving it silently empty.
+ */
 class LocationSource(
     context: Context,
 ) {
     private val client = LocationServices.getFusedLocationProviderClient(context)
 
     @SuppressLint("MissingPermission") // caller gates on the runtime permission
-    fun fixes(): Flow<Fix> =
+    fun fixes(onAvailability: (Boolean) -> Unit = {}): Flow<Fix> =
         callbackFlow {
             val request =
                 LocationRequest
@@ -29,6 +35,10 @@ class LocationSource(
                     .build()
             val callback =
                 object : LocationCallback() {
+                    override fun onLocationAvailability(availability: LocationAvailability) {
+                        onAvailability(availability.isLocationAvailable)
+                    }
+
                     override fun onLocationResult(result: LocationResult) {
                         val location = result.lastLocation ?: return
                         trySend(
@@ -43,7 +53,9 @@ class LocationSource(
                         )
                     }
                 }
-            client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+            client
+                .requestLocationUpdates(request, callback, Looper.getMainLooper())
+                .addOnFailureListener { close(it) }
             awaitClose { client.removeLocationUpdates(callback) }
         }
 

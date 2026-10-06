@@ -62,4 +62,20 @@ class BubbleStateMappingTest {
         val state = runningWithFix.copy(activeSection = DetectionStatus.ActiveSection(70, 68))
         assertEquals(BubbleState.Section(70, 68), BubbleOverlayController.stateFor(state))
     }
+
+    @Test
+    fun `fixes that stopped coming are never green`() {
+        val state = runningWithFix.copy(gpsStale = true)
+        assertEquals(BubbleState.NoGps, BubbleOverlayController.stateFor(state))
+    }
+
+    @Test
+    fun `stale GPS hides an alert card too`() {
+        val state =
+            runningWithFix.copy(
+                gpsStale = true,
+                activeAlert = DetectionStatus.ActiveAlert(CameraType.FIXED, 50, 249),
+            )
+        assertEquals(BubbleState.NoGps, BubbleOverlayController.stateFor(state))
+    }
 }

@@ -34,6 +34,8 @@ object DetectionStatus {
         val voiceMissing: Boolean = false,
         /** Android location services were switched off while detection runs. */
         val locationOff: Boolean = false,
+        /** Fixes stopped arriving (tunnel, car park, provider reported unavailable). */
+        val gpsStale: Boolean = false,
     )
 
     private val _state = MutableStateFlow(UiState())

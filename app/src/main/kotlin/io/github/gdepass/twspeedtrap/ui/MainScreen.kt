@@ -34,7 +34,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,12 +44,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.service.DetectionService
 import io.github.gdepass.twspeedtrap.service.DetectionStatus
+import io.github.gdepass.twspeedtrap.util.appSettingsIntent
+import io.github.gdepass.twspeedtrap.util.startActivitySafely
 
 @Composable
 fun MainScreen(
@@ -64,8 +69,40 @@ fun MainScreen(
         onPauseOrDispose {}
     }
     val checks = remember(permissionRefresh) { SystemChecks.read(context) }
+    // Permissions Android will no longer ask for (denied twice, or "don't ask
+    // again"): the only way forward is the app's settings page, so the card
+    // button must take the rider there instead of silently doing nothing.
+    var deniedForever by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var requested by remember { mutableStateOf<String?>(null) }
     val permissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionRefresh++ }
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            permissionRefresh++
+            val permission = requested ?: return@rememberLauncherForActivityResult
+            val granted = result[permission] == true
+            val activity = context as? android.app.Activity
+            if (!granted &&
+                activity != null &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+            ) {
+                deniedForever = deniedForever + permission
+            }
+        }
+    val requestPermission: (String) -> Unit = { permission ->
+        if (permission in deniedForever) {
+            context.startActivitySafely(context.appSettingsIntent())
+        } else {
+            requested = permission
+            // Android 12+ ignores a fine-location request made without coarse
+            // in the same call (no dialog, nothing granted).
+            val group =
+                if (permission == Manifest.permission.ACCESS_FINE_LOCATION) {
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                } else {
+                    arrayOf(permission)
+                }
+            permissionLauncher.launch(group)
+        }
+    }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(
@@ -85,9 +122,10 @@ fun MainScreen(
 
             PermissionChecklist(
                 checks = checks,
-                onRequestPermission = { permissionLauncher.launch(it) },
+                deniedForever = deniedForever,
+                onRequestPermission = requestPermission,
                 onRequestBatteryExemption = {
-                    context.startActivity(
+                    context.startActivitySafely(
                         Intent(
                             Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                             Uri.parse("package:${context.packageName}"),
@@ -95,7 +133,7 @@ fun MainScreen(
                     )
                 },
                 onOpenLocationSettings = {
-                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                    context.startActivitySafely(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                 },
             )
 
@@ -117,16 +155,32 @@ fun MainScreen(
 @Composable
 private fun PermissionChecklist(
     checks: SystemChecks,
+    deniedForever: Set<String>,
     onRequestPermission: (String) -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onOpenLocationSettings: () -> Unit,
 ) {
-    if (!checks.fineGranted) {
+    @Composable
+    fun requestCard(
+        permission: String,
+        title: Int,
+        body: Int,
+        grant: Int,
+    ) {
+        val blocked = permission in deniedForever
         PermissionCard(
-            title = stringResource(R.string.perm_location_title),
-            body = stringResource(R.string.perm_location_body),
-            buttonLabel = stringResource(R.string.perm_location_grant),
-        ) { onRequestPermission(Manifest.permission.ACCESS_FINE_LOCATION) }
+            title = stringResource(title),
+            body = if (blocked) stringResource(R.string.perm_denied_hint) else stringResource(body),
+            buttonLabel = stringResource(if (blocked) R.string.perm_open_settings else grant),
+        ) { onRequestPermission(permission) }
+    }
+    if (!checks.fineGranted) {
+        requestCard(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            R.string.perm_location_title,
+            R.string.perm_location_body,
+            R.string.perm_location_grant,
+        )
         return
     }
     if (!checks.locationEnabled) {
@@ -138,18 +192,20 @@ private fun PermissionChecklist(
         )
     }
     if (!checks.backgroundGranted) {
-        PermissionCard(
-            title = stringResource(R.string.perm_background_title),
-            body = stringResource(R.string.perm_background_body),
-            buttonLabel = stringResource(R.string.perm_background_grant),
-        ) { onRequestPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) }
+        requestCard(
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            R.string.perm_background_title,
+            R.string.perm_background_body,
+            R.string.perm_background_grant,
+        )
     }
     if (!checks.notificationsGranted) {
-        PermissionCard(
-            title = stringResource(R.string.perm_notifications_title),
-            body = stringResource(R.string.perm_notifications_body),
-            buttonLabel = stringResource(R.string.perm_notifications_grant),
-        ) { onRequestPermission(Manifest.permission.POST_NOTIFICATIONS) }
+        requestCard(
+            Manifest.permission.POST_NOTIFICATIONS,
+            R.string.perm_notifications_title,
+            R.string.perm_notifications_body,
+            R.string.perm_notifications_grant,
+        )
     }
     if (!checks.batteryExempt) {
         PermissionCard(
@@ -202,11 +258,12 @@ private fun StatusRow(
                     !state.running -> ""
                     state.locationOff -> stringResource(R.string.gps_disabled_warning)
                     state.accuracyM == null -> stringResource(R.string.gps_waiting)
+                    state.gpsStale -> stringResource(R.string.gps_lost_warning)
                     else -> stringResource(R.string.gps_accuracy, state.accuracyM)
                 },
             style = MaterialTheme.typography.labelLarge,
             color =
-                if (state.locationOff) {
+                if (state.locationOff || state.gpsStale) {
                     MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant

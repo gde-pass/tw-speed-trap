@@ -24,6 +24,7 @@ import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.detection.AlertEngine
 import io.github.gdepass.twspeedtrap.detection.AlertEvent
 import io.github.gdepass.twspeedtrap.detection.CameraType
+import io.github.gdepass.twspeedtrap.detection.Fix
 import io.github.gdepass.twspeedtrap.detection.StationaryDetector
 import io.github.gdepass.twspeedtrap.util.LocaleOverride
 import kotlinx.coroutines.CancellationException
@@ -131,51 +132,85 @@ class DetectionService : LifecycleService() {
         // the database load below must not go unnoticed.
         watchLocationServices()
         val repository = CameraRepository(this@DetectionService)
-        val (cameras, sections) =
-            withContext(Dispatchers.IO) { repository.loadCameras() to repository.loadSections() }
+        val (cameras, sections) = withContext(Dispatchers.IO) { repository.loadAll() }
         val engine = AlertEngine(cameras, settings.toEngineConfig(), sections)
         DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
         val stationary = StationaryDetector()
         val throttle = NotificationThrottle()
+        val staleWatch = launchStaleFixWatch()
 
-        LocationSource(this@DetectionService).fixes().collect { fix ->
-            if (settings.autoStopEnabled && stationary.onFix(fix)) {
-                Log.i(TAG, "stationary for ${StationaryDetector.HOLD_MS / 60_000} min — stopping detection")
-                announcer?.speak(localized.getString(R.string.alert_auto_stopped), chimeEnabled)
-                delay(AUTO_STOP_SPEECH_MS)
-                stopDetection()
-                return@collect
-            }
-            engine.onFix(fix).forEach(::announce)
-            val nearest = engine.nearestCamera
-            val alert =
-                engine.activeAlert?.let { (camera, distance) ->
-                    DetectionStatus.ActiveAlert(camera.type, camera.speedLimitKmh, distance.roundToInt())
+        LocationSource(this@DetectionService)
+            .fixes(onAvailability = { available -> if (!available) markGpsStale() })
+            .collect { fix ->
+                if (settings.autoStopEnabled && stationary.onFix(fix)) {
+                    Log.i(TAG, "stationary for ${StationaryDetector.HOLD_MS / 60_000} min — stopping detection")
+                    announcer?.speak(localized.getString(R.string.alert_auto_stopped), chimeEnabled)
+                    announcer?.awaitIdle(FINAL_SPEECH_MAX_MS)
+                    staleWatch.cancel()
+                    stopDetection()
+                    return@collect
                 }
-            val section =
-                engine.activeSection?.let { (sec, projected) ->
-                    DetectionStatus.ActiveSection(sec.speedLimitKmh, projected)
-                }
-            val speedKmh = (fix.speedMps * 3.6).roundToInt()
-            DetectionStatus.update {
-                it.copy(
-                    speedKmh = speedKmh,
-                    accuracyM = fix.accuracyM.roundToInt(),
-                    nextCameraDistanceM = nearest?.second?.roundToInt(),
-                    nextCameraLimitKmh = nearest?.first?.speedLimitKmh,
-                    activeAlert = alert,
-                    activeSection = section,
-                )
+                lastFixElapsedMs = SystemClock.elapsedRealtime()
+                engine.onFix(fix).forEach(::announce)
+                publish(engine, fix, throttle)
             }
-            val rendered =
-                NotificationThrottle.Rendered(
-                    speedKmh,
-                    nearest?.second?.roundToInt()?.let(NotificationThrottle::bucket),
-                )
-            if (throttle.shouldNotify(rendered, SystemClock.elapsedRealtime())) {
-                updateNotification(rendered.speedKmh, rendered.distanceBucketM)
+    }
+
+    /** Pushes one fix's engine state to the UI flow and the (throttled) notification. */
+    private fun publish(
+        engine: AlertEngine,
+        fix: Fix,
+        throttle: NotificationThrottle,
+    ) {
+        val nearest = engine.nearestCamera
+        val alert =
+            engine.activeAlert?.let { (camera, distance) ->
+                DetectionStatus.ActiveAlert(camera.type, camera.speedLimitKmh, distance.roundToInt())
+            }
+        val section =
+            engine.activeSection?.let { (sec, projected) ->
+                DetectionStatus.ActiveSection(sec.speedLimitKmh, projected)
+            }
+        val speedKmh = (fix.speedMps * 3.6).roundToInt()
+        DetectionStatus.update {
+            it.copy(
+                speedKmh = speedKmh,
+                accuracyM = fix.accuracyM.roundToInt(),
+                nextCameraDistanceM = nearest?.second?.roundToInt(),
+                nextCameraLimitKmh = nearest?.first?.speedLimitKmh,
+                activeAlert = alert,
+                activeSection = section,
+                gpsStale = false,
+            )
+        }
+        val rendered =
+            NotificationThrottle.Rendered(
+                speedKmh,
+                nearest?.second?.roundToInt()?.let(NotificationThrottle::bucket),
+            )
+        if (throttle.shouldNotify(rendered, SystemClock.elapsedRealtime())) {
+            updateNotification(rendered.speedKmh, rendered.distanceBucketM)
+        }
+    }
+
+    private var lastFixElapsedMs = 0L
+
+    /** Fixes that stop coming (tunnel, car park) must not leave the last speed
+     * and a green bubble on screen: after [STALE_FIX_MS] without a fix the
+     * status goes stale, which the bubble and the main screen show as no GPS. */
+    private fun launchStaleFixWatch(): Job =
+        lifecycleScope.launch {
+            lastFixElapsedMs = SystemClock.elapsedRealtime()
+            while (true) {
+                delay(STALE_CHECK_MS)
+                if (SystemClock.elapsedRealtime() - lastFixElapsedMs > STALE_FIX_MS) markGpsStale()
             }
         }
+
+    private fun markGpsStale() {
+        if (DetectionStatus.state.value.gpsStale) return
+        Log.w(TAG, "no GPS fix for a while — showing detection as blind")
+        DetectionStatus.update { it.copy(gpsStale = true) }
     }
 
     /** Detection died (revoked permission, corrupt database, …): the rider
@@ -193,7 +228,7 @@ class DetectionService : LifecycleService() {
                 .build(),
         )
         announcer?.speak(localized.getString(R.string.alert_detection_failed), chimeEnabled)
-        delay(AUTO_STOP_SPEECH_MS)
+        announcer?.awaitIdle(FINAL_SPEECH_MAX_MS)
         stopDetection()
     }
 
@@ -371,6 +406,10 @@ class DetectionService : LifecycleService() {
         private const val CHANNEL_ID = "detection"
         private const val NOTIFICATION_ID = 1
         private const val FAILURE_NOTIFICATION_ID = 3
-        private const val AUTO_STOP_SPEECH_MS = 3_000L
+
+        /** Upper bound on waiting for a final announcement to finish before stopping. */
+        private const val FINAL_SPEECH_MAX_MS = 8_000L
+        private const val STALE_FIX_MS = 8_000L
+        private const val STALE_CHECK_MS = 2_000L
     }
 }

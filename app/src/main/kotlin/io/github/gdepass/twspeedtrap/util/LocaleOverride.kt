@@ -24,13 +24,26 @@ object LocaleOverride {
         return context.createConfigurationContext(configuration)
     }
 
+    /**
+     * The locale the TTS voice must speak. With "system" this is not simply
+     * the device locale: strings only ship in [SUPPORTED_LANGUAGES], so on a
+     * zh-TW phone the alert text resolves to English and a Mandarin voice
+     * would read English words. The voice follows whichever device language
+     * the strings actually resolve to.
+     */
     fun resolve(
         context: Context,
         languageTag: String,
-    ): Locale =
-        if (languageTag == SYSTEM || languageTag.isBlank()) {
-            context.resources.configuration.locales[0]
-        } else {
-            Locale.forLanguageTag(languageTag)
-        }
+    ): Locale {
+        if (languageTag != SYSTEM && languageTag.isNotBlank()) return Locale.forLanguageTag(languageTag)
+        val locales = context.resources.configuration.locales
+        return speechLocale(List(locales.size()) { locales[it] })
+    }
+
+    /** First device locale whose language has a string bundle; English otherwise. */
+    fun speechLocale(deviceLocales: List<Locale>): Locale =
+        deviceLocales.firstOrNull { it.language in SUPPORTED_LANGUAGES } ?: Locale.ENGLISH
+
+    /** Languages with a values[-xx]/strings.xml; keep in sync with res/. */
+    val SUPPORTED_LANGUAGES = setOf("en", "fr")
 }

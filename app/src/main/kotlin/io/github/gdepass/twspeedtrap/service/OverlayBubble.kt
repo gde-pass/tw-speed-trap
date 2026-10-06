@@ -173,7 +173,20 @@ class OverlayBubble(
         params.width = newW
         params.height = newH
         clampToScreen()
-        if (attached) windowManager.updateViewLayout(this, params)
+        updateLayout()
+    }
+
+    /** The system may have pulled the window (overlay permission revoked while
+     * up); a refused update then just marks the bubble detached instead of
+     * killing the controller's collector. */
+    private fun updateLayout() {
+        if (!attached) return
+        try {
+            windowManager.updateViewLayout(this, params)
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "overlay window gone — marking detached", e)
+            attached = false
+        }
     }
 
     /** A dragged or restored position must never strand the bubble off-screen. */
@@ -357,7 +370,7 @@ class OverlayBubble(
                     params.x = dragStartX + dx.roundToInt()
                     params.y = dragStartY + dy.roundToInt()
                     clampToScreen()
-                    if (attached) windowManager.updateViewLayout(this, params)
+                    updateLayout()
                 }
             }
             MotionEvent.ACTION_UP -> {

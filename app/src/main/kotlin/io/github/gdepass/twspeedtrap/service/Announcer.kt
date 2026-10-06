@@ -11,6 +11,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import io.github.gdepass.twspeedtrap.R
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 /**
@@ -47,6 +48,9 @@ class Announcer(
             .build()
 
     private var ready = false
+
+    @Volatile
+    private var released = false
     private var pending: Pair<String, Boolean>? = null
     private var utteranceSeq = 0
 
@@ -90,6 +94,11 @@ class Announcer(
 
     private val tts: TextToSpeech =
         TextToSpeech(context) { status ->
+            if (released) {
+                // Engine bound after a quick start→stop: a shut-down engine
+                // would report a missing voice onto an idle screen.
+                return@TextToSpeech
+            }
             if (status == TextToSpeech.SUCCESS) {
                 onInitialized()
             } else {
@@ -190,7 +199,23 @@ class Announcer(
         handler.postDelayed(backstop, BACKSTOP_POLL_MS)
     }
 
+    /**
+     * Suspends until the queue has drained — the engine is bound, nothing is
+     * waiting for it, and focus is back — or [timeoutMs] has passed. Lets a
+     * final announcement ("stopping detection") finish instead of being cut
+     * at a fixed delay, whatever the language or a cold engine's bind time.
+     */
+    suspend fun awaitIdle(timeoutMs: Long) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (ready && pending == null && !ledger.isHolding) return
+            delay(IDLE_POLL_MS)
+        }
+        Log.w(TAG, "announcement still playing after ${timeoutMs}ms — not waiting longer")
+    }
+
     fun release() {
+        released = true
         handler.removeCallbacks(backstop)
         tts.stop()
         tts.shutdown()
@@ -202,5 +227,6 @@ class Announcer(
         private const val EARCON_CHIME = "[twsp_chime]"
         private const val EARCON_ALL_CLEAR = "[twsp_all_clear]"
         private const val BACKSTOP_POLL_MS = 500L
+        private const val IDLE_POLL_MS = 100L
     }
 }

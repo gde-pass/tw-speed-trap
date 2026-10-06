@@ -41,6 +41,11 @@
 - Section over-pace projection scales the straight-line remainder by length/chord — a curved section at the limit must never warn (壽卡 is 6.0 km of road on a 3.5 km chord)
 - Missing source columns raise SchemaError; unresolved/suppressed rows are always counted, never silent
 - The overlay bubble must come down when the app's last activity is destroyed: an overlay window pins the process at perceptible oom_adj (200), so a bubble that outlives its app is never reclaimed and only the settings toggle can kill it
+- BubbleOverlayController's collector is the only thing that can take the bubble down: it must never die (collectForever catches, detaches, restarts) and every WindowManager call in OverlayBubble is guarded
+- CameraRepository is fail-safe to the bundled db: an unreadable file is replaced from assets and the read retried; every file install is tmp + fsync + rename; load cameras and sections from one open (`loadAll`)
+- Blind detection must never look protected: `gpsStale` (no fix for 8 s or provider unavailable) renders as NoGps in the bubble and as a red warning on the main screen
+- The TTS voice follows the locale the strings resolve to (`LocaleOverride.speechLocale`), never the raw device locale — a zh-TW phone reads English strings with an English voice
+- Implicit system intents go through `Context.startActivitySafely`; fine location is always requested together with coarse (Android 12+ ignores fine alone); a permission denied without rationale switches the card to "Open app settings"
 - Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + a 500 ms `tts.isSpeaking()` poll backstop with a 30 s hard cap) — never a single last-utterance-id gate, never a fixed long timeout as the only fallback (music stayed ducked 30 s whenever onDone was lost)
 
 ## Tooling quirks

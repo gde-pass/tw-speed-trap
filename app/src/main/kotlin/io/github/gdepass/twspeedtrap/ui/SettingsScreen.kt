@@ -59,6 +59,7 @@ import io.github.gdepass.twspeedtrap.data.UpdateWorker
 import io.github.gdepass.twspeedtrap.detection.CameraType
 import io.github.gdepass.twspeedtrap.service.DetectionStatus
 import io.github.gdepass.twspeedtrap.util.LocaleOverride
+import io.github.gdepass.twspeedtrap.util.startActivitySafely
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -232,12 +233,12 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { context.startActivity(installVoicesIntent()) }) {
+                Button(onClick = { context.startActivitySafely(installVoicesIntent()) }) {
                     Text(stringResource(R.string.voice_install))
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            Button(onClick = { context.startActivity(ttsSettingsIntent()) }) {
+            Button(onClick = { context.startActivitySafely(ttsSettingsIntent()) }) {
                 Text(stringResource(R.string.voice_open_tts_settings))
             }
             Spacer(Modifier.height(24.dp))
@@ -336,7 +337,7 @@ private fun OverlayBubbleSetting(
     fun permissionMissing() = !Settings.canDrawOverlays(context)
 
     SwitchRow(stringResource(R.string.settings_overlay_bubble), enabled) { on ->
-        if (on && permissionMissing()) context.startActivity(overlayPermissionIntent(context))
+        if (on && permissionMissing()) context.startActivitySafely(overlayPermissionIntent(context))
         onSetEnabled(on)
     }
     val warn = remember(refresh, enabled) { enabled && permissionMissing() }
@@ -346,7 +347,7 @@ private fun OverlayBubbleSetting(
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodySmall,
         )
-        Button(onClick = { context.startActivity(overlayPermissionIntent(context)) }) {
+        Button(onClick = { context.startActivitySafely(overlayPermissionIntent(context)) }) {
             Text(stringResource(R.string.settings_overlay_permission_grant))
         }
     }
