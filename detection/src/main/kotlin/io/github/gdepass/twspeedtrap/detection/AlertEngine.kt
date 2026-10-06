@@ -22,6 +22,17 @@ data class EngineConfig(
  * Turns a stream of GPS fixes into alert events. Each camera fires at most
  * once per approach: after firing it stays disarmed until the rider has moved
  * away beyond rearmFactor × alert distance (hysteresis).
+ *
+ * Direction comes from the live GPS bearing at speed, or from the bearing
+ * last seen at speed within [BEARING_MEMORY_MS] while crawling or stopped —
+ * so queuing at a red light does not fail open onto the opposite-direction
+ * camera of the same junction. Only a rider with no recent bearing at all
+ * (start-up) is alerted regardless of direction.
+ *
+ * A camera fires only while it is still ahead: a camera that enforces a
+ * direction is "passed" once the rider is downstream of it along that axis
+ * (position only, so a hairpin apex cannot fake a pass), a bearingless
+ * camera once it falls into the rear half-plane of the travel bearing.
  */
 class AlertEngine(
     cameras: List<Camera>,
@@ -44,6 +55,8 @@ class AlertEngine(
     private val pendingPasses = LinkedHashMap<String, PendingPass>()
     private val sectionTracker = AverageSpeedTracker(cameras, sections, config)
     private val sectionsEnabled = CameraType.SECTION in config.enabledTypes
+    private var lastReliableBearingDeg: Double? = null
+    private var lastReliableBearingTimeMs: Long = Long.MIN_VALUE
 
     /** Distance to the nearest relevant camera, for the UI. */
     var nearestCamera: Pair<Camera, Double>? = null
@@ -57,6 +70,7 @@ class AlertEngine(
     val activeSection: Pair<Section, Int>? get() = sectionTracker.liveStatus
 
     fun onFix(fix: Fix): List<AlertEvent> {
+        updateBearingMemory(fix)
         val events = ArrayList<AlertEvent>(1)
         val alertDistance =
             if (fix.speedMps * 3.6 >= HIGH_SPEED_THRESHOLD_KMH) {
@@ -127,8 +141,8 @@ class AlertEngine(
             // ahead: forget it even on untrusted fixes, or a pending pass
             // could stick forever through persistently poor accuracy.
             distance > PASS_FORGET_DISTANCE_M -> true
-            fix.accuracyM > PASS_ACCURACY_GATE_M -> false
-            isBehind(fix, pending.camera) -> true
+            fix.accuracyM > ACCURACY_GATE_M -> false
+            isBehind(fix, pending.camera, distance) -> true
             fix.speedMps < config.minSpeedForBearingMps -> false
             else -> {
                 pending.minDistanceM = min(pending.minDistanceM, distance)
@@ -154,7 +168,7 @@ class AlertEngine(
             // A just-passed camera is "next" only while it is still ahead.
             return if (isAhead(fix, camera)) distance else null
         }
-        if (!bearingMatches(fix, camera)) return null
+        if (!isCandidate(fix, camera, distance)) return null
         if (distance <= alertDistance) {
             disarmed[camera.id] = alertDistance
             val speedKmh = (fix.speedMps * 3.6).roundToInt()
@@ -166,37 +180,82 @@ class AlertEngine(
         return distance
     }
 
+    /**
+     * May this camera fire or count as the next camera on this fix? Untrusted
+     * fixes (network/wifi fallback in tunnels and urban canyons, often with no
+     * speed and no bearing) decide nothing: a 500 m-accuracy point would
+     * otherwise fire any camera within the ring. A camera already behind the
+     * rider is not "ahead" however the ring compares: without that gate a
+     * camera re-armed at 450 m behind re-fired when accelerating past
+     * 100 km/h widened the ring to 500 m.
+     */
+    private fun isCandidate(
+        fix: Fix,
+        camera: Camera,
+        distance: Double,
+    ): Boolean = fix.accuracyM <= ACCURACY_GATE_M && bearingMatches(fix, camera) && !isBehind(fix, camera, distance)
+
     private fun isAhead(
         fix: Fix,
         camera: Camera,
     ): Boolean {
-        if (fix.speedMps < config.minSpeedForBearingMps) return false
-        val travel = fix.bearingDeg ?: return false
+        val travel = effectiveBearing(fix) ?: return false
         val toCamera = GeoMath.bearingDegrees(fix.lat, fix.lon, camera.lat, camera.lon)
         return angularDifference(travel, toCamera) <= AHEAD_HALF_PLANE_DEG
     }
 
-    /** Not the negation of [isAhead]: without a trustworthy bearing (slow or
-     * missing) the position is unknown, and a rider braking to a stop at the
-     * camera must not be declared clear. */
+    /**
+     * Not the negation of [isAhead]. A camera enforcing a direction is behind
+     * once the rider is downstream of it along that axis — decided from
+     * position alone, so a hairpin apex (heading momentarily away from a
+     * camera still ahead by road) cannot fake a pass, and a camera 485 m
+     * back is behind whatever the ring says. Within [AXIS_MIN_DISTANCE_M]
+     * the camera→rider bearing is GPS noise, so nothing is decided there.
+     * A bearingless camera falls back to the travel bearing; without a
+     * trustworthy one (no recent bearing at speed) the position is unknown,
+     * and a rider braking to a stop at the camera must not be declared clear.
+     */
     private fun isBehind(
         fix: Fix,
         camera: Camera,
+        distance: Double,
     ): Boolean {
-        if (fix.speedMps < config.minSpeedForBearingMps) return false
-        val travel = fix.bearingDeg ?: return false
+        val enforced = camera.bearingDeg
+        if (enforced != null) {
+            if (distance < AXIS_MIN_DISTANCE_M) return false
+            val fromCamera = GeoMath.bearingDegrees(camera.lat, camera.lon, fix.lat, fix.lon)
+            return angularDifference(fromCamera, enforced) < AHEAD_HALF_PLANE_DEG
+        }
+        val travel = effectiveBearing(fix) ?: return false
         val toCamera = GeoMath.bearingDegrees(fix.lat, fix.lon, camera.lat, camera.lon)
         return angularDifference(travel, toCamera) > AHEAD_HALF_PLANE_DEG
     }
 
+    /** Fails open only when no direction is known at all: a bearingless
+     * camera, or a rider with no bearing seen at speed within the memory. */
     private fun bearingMatches(
         fix: Fix,
         camera: Camera,
     ): Boolean {
         val enforced = camera.bearingDeg ?: return true
-        if (fix.speedMps < config.minSpeedForBearingMps) return true
-        val travel = fix.bearingDeg ?: return true
+        val travel = effectiveBearing(fix) ?: return true
         return angularDifference(travel, enforced) <= config.bearingToleranceDeg
+    }
+
+    private fun updateBearingMemory(fix: Fix) {
+        val bearing = fix.bearingDeg ?: return
+        if (fix.speedMps < config.minSpeedForBearingMps) return
+        lastReliableBearingDeg = bearing
+        lastReliableBearingTimeMs = fix.timestampMs
+    }
+
+    /** Live bearing at speed, else the one remembered from the last fix at
+     * speed while it is fresh; null when the direction is unknown. */
+    private fun effectiveBearing(fix: Fix): Double? {
+        if (fix.speedMps >= config.minSpeedForBearingMps && fix.bearingDeg != null) return fix.bearingDeg
+        val remembered = lastReliableBearingDeg ?: return null
+        if (fix.timestampMs - lastReliableBearingTimeMs > BEARING_MEMORY_MS) return null
+        return remembered
     }
 
     companion object {
@@ -209,8 +268,15 @@ class AlertEngine(
         /** Fallback pass detection: clear once this much farther than the closest approach. */
         const val PASS_CLEAR_MARGIN_M = 75.0
 
-        /** Fixes with worse accuracy than this decide nothing about passing a camera. */
-        const val PASS_ACCURACY_GATE_M = 50.0
+        /** Fixes with worse accuracy than this decide nothing — neither firing
+         * nor passing; the 99 m no-accuracy sentinel still participates. */
+        const val ACCURACY_GATE_M = 100.0
+
+        /** Closer than this the camera→rider bearing is noise; the axis test waits for the next fix. */
+        const val AXIS_MIN_DISTANCE_M = 25.0
+
+        /** A bearing seen at speed stays trustworthy this long while crawling or stopped. */
+        const val BEARING_MEMORY_MS = 120_000L
 
         /** Beyond this distance a pending pass is forgotten regardless of fix quality. */
         const val PASS_FORGET_DISTANCE_M = 1_500.0

@@ -35,6 +35,10 @@
 ## Architecture invariants
 - detection/ is pure JVM and GPX-replay-deterministic: fix timestamps only — no wall clocks, no randomness
 - Null camera bearing = alert both directions (fail-safe); dedupe/merges must never narrow a null bearing
+- AlertEngine fires only for cameras ahead: a bearing camera is "behind" once the rider is downstream along its enforced axis (position-only, so hairpins can't fake a pass), a bearingless one once it is in the rear half-plane; the same `isBehind` gates firing and the all-clear so a camera can never fire and clear on consecutive fixes
+- Direction at low speed comes from the bearing last seen at speed (120 s memory); fail-open (alert regardless of direction) only when no bearing is known at all — never add a speed-based fail-open back (opposite-direction red-light cameras at every junction)
+- Fixes with accuracy > 100 m decide nothing in the engine (no fire, no pass); the 99 m no-accuracy sentinel participates
+- Section over-pace projection scales the straight-line remainder by length/chord — a curved section at the limit must never warn (壽卡 is 6.0 km of road on a 3.5 km chord)
 - Missing source columns raise SchemaError; unresolved/suppressed rows are always counted, never silent
 - The overlay bubble must come down when the app's last activity is destroyed: an overlay window pins the process at perceptible oom_adj (200), so a bubble that outlives its app is never reclaimed and only the settings toggle can kill it
 - Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + a 500 ms `tts.isSpeaking()` poll backstop with a 30 s hard cap) — never a single last-utterance-id gate, never a fixed long timeout as the only fallback (music stayed ducked 30 s whenever onDone was lost)

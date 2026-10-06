@@ -410,4 +410,68 @@ class AverageSpeedTrackerTest {
         val fixes = drive(speedKmh = 55.0, gap = 100.0..(lengthM + 250.0), until = lengthM + 400.0)
         assertEquals(replay(fixes), replay(fixes))
     }
+
+    // ---- curved sections -----------------------------------------------------
+
+    /** A 2000 m section whose exit gantry is only 1200 m from the entry as the
+     * crow flies (chord/length = 0.6, like 壽卡). Fixes advance 0.6 m of
+     * latitude per metre ridden, as a zigzagging road would. */
+    private fun curvedTracker(): AverageSpeedTracker {
+        val chordM = 1200.0
+        val curvedExitLat = entryLat + chordM * degPerMeter
+        return AverageSpeedTracker(
+            listOf(
+                sectionCamera("sec-curve-entry", entryLat, 0.0, "curve", "start"),
+                sectionCamera("sec-curve-exit", curvedExitLat, 0.0, "curve", "end"),
+            ),
+            mapOf("curve" to Section("curve", 50, lengthM)),
+        )
+    }
+
+    private fun curvedDrive(speedKmh: Double): List<Fix> {
+        val speedMps = speedKmh / 3.6
+        val fixes = mutableListOf<Fix>()
+        var roadM = -200.0
+        var timeMs = 0L
+        while (roadM < lengthM + 200.0) {
+            val straightM = if (roadM < 0.0) roadM else roadM * 0.6
+            fixes.add(northboundFix(straightM, speedMps, timeMs))
+            roadM += speedMps
+            timeMs += 1000L
+        }
+        return fixes
+    }
+
+    @Test
+    fun `riding a curved section at the limit never warns`() {
+        val tracker = curvedTracker()
+        val events = curvedDrive(50.0).flatMap(tracker::onFix)
+        assertEquals(1, events.count { it is AlertEvent.SectionEntered })
+        assertTrue(
+            events.none { it is AlertEvent.SectionOverPace },
+            "at exactly the limit the projection must not exceed it, got $events",
+        )
+        val exit = events.filterIsInstance<AlertEvent.SectionExited>().single()
+        assertTrue(exit.averageKmh in 48..52, "2000 m at 50 km/h, got ${exit.averageKmh}")
+        assertFalse(exit.overLimit)
+    }
+
+    @Test
+    fun `curved section live projection reads the ridden speed`() {
+        val tracker = curvedTracker()
+        var projection: Int? = null
+        for (fix in curvedDrive(50.0).take(60)) {
+            tracker.onFix(fix)
+            tracker.liveStatus?.let { projection = it.second }
+        }
+        assertTrue(projection != null && projection!! in 48..52, "expected ~50 km/h projected, got $projection")
+    }
+
+    @Test
+    fun `riding a curved section too fast still warns`() {
+        val tracker = curvedTracker()
+        val events = curvedDrive(80.0).flatMap(tracker::onFix)
+        val warning = events.filterIsInstance<AlertEvent.SectionOverPace>().single()
+        assertTrue(warning.projectedAvgKmh in 78..82, "expected ~80 km/h projected, got ${warning.projectedAvgKmh}")
+    }
 }

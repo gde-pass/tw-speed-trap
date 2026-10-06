@@ -23,13 +23,15 @@ class AlertEngineTest {
         speedKmh: Double = 60.0,
         bearing: Double? = 180.0,
         accuracy: Double = 5.0,
+        timeMs: Long = 0L,
+        lon: Double = 120.65000,
     ) = Fix(
         lat = lat,
-        lon = 120.65000,
+        lon = lon,
         speedMps = speedKmh / 3.6,
         bearingDeg = bearing,
         accuracyM = accuracy,
-        timestampMs = 0L,
+        timestampMs = timeMs,
     )
 
     private val degPerMeterLat = 1.0 / 110_540.0
@@ -55,9 +57,12 @@ class AlertEngineTest {
         val passed = engine.onFix(fix(camera.lat - 220 * degPerMeterLat))
         assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), passed)
         assertTrue(engine.onFix(fix(camera.lat - 150 * degPerMeterLat)).isEmpty())
-        // Beyond 1.5 × alert distance (450 m): re-arms, and a fresh approach fires again.
+        // Beyond 1.5 × alert distance (450 m): re-arms. Looping back for a
+        // fresh southbound approach from the north fires again; 150 m south
+        // of it heading south is behind the camera and must not.
         assertTrue(engine.onFix(fix(camera.lat - 500 * degPerMeterLat)).isEmpty())
-        assertEquals(1, engine.onFix(fix(camera.lat - 150 * degPerMeterLat)).size)
+        assertTrue(engine.onFix(fix(camera.lat - 150 * degPerMeterLat)).isEmpty())
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
     }
 
     @Test
@@ -112,7 +117,9 @@ class AlertEngineTest {
     @Test
     fun `null-bearing camera alerts both directions`() {
         val engine = AlertEngine(listOf(camera.copy(bearingDeg = null)))
-        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat, bearing = 0.0)).size)
+        // Northbound approach from 150 m south: the southbound-only camera
+        // would ignore it; without a bearing it must alert.
+        assertEquals(1, engine.onFix(fix(camera.lat - 150 * degPerMeterLat, bearing = 0.0)).size)
     }
 
     @Test
@@ -271,6 +278,136 @@ class AlertEngineTest {
         engine.onFix(fix(camera.lat + 80 * degPerMeterLat))
         val nearest = engine.nearestCamera
         assertTrue(nearest != null && nearest.second in 70.0..90.0, "expected ~80 m, got $nearest")
+    }
+
+    // ---- firing only while the camera is ahead ------------------------------
+
+    @Test
+    fun `re-armed camera behind must not re-fire when crossing 100 kmh`() {
+        val engine = AlertEngine(listOf(camera))
+        // Expressway pattern: brake under 100 for the camera (300 m ring fires,
+        // re-arm at 450 m), pass it, accelerate past 100 (ring widens to 500 m).
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat, speedKmh = 95.0)).size)
+        assertEquals(
+            listOf<AlertEvent>(AlertEvent.AllClear(camera)),
+            engine.onFix(fix(camera.lat - 100 * degPerMeterLat)),
+        )
+        assertTrue(engine.onFix(fix(camera.lat - 460 * degPerMeterLat, speedKmh = 105.0)).isEmpty())
+        val behind = engine.onFix(fix(camera.lat - 485 * degPerMeterLat, speedKmh = 105.0))
+        assertTrue(behind.isEmpty(), "a camera 485 m behind must not fire, got $behind")
+        assertTrue(engine.nearestCamera == null, "a camera behind is not the next camera")
+    }
+
+    @Test
+    fun `camera behind in the enforced direction never fires`() {
+        val engine = AlertEngine(listOf(camera))
+        // Southbound rider 200 m south of a southbound-enforcing camera: the
+        // bearing matches and the ring contains it, but it is already passed.
+        assertTrue(engine.onFix(fix(camera.lat - 200 * degPerMeterLat)).isEmpty())
+        assertTrue(engine.nearestCamera == null)
+    }
+
+    @Test
+    fun `bearingless camera behind the rider never fires`() {
+        val engine = AlertEngine(listOf(camera.copy(bearingDeg = null)))
+        assertTrue(engine.onFix(fix(camera.lat - 200 * degPerMeterLat)).isEmpty())
+    }
+
+    // ---- bearing memory at low speed ---------------------------------------
+
+    @Test
+    fun `stopped at a red light before an opposite-direction camera does not alert`() {
+        val engine = AlertEngine(listOf(camera))
+        // Northbound at speed 400 m south of the southbound-enforcing camera.
+        assertTrue(engine.onFix(fix(camera.lat - 400 * degPerMeterLat, bearing = 0.0, timeMs = 0)).isEmpty())
+        // Queued 50 m south of it: GPS bearing gone, speed under the threshold.
+        // The old fail-open fired here; the remembered northbound bearing must not.
+        val queued =
+            engine.onFix(
+                fix(camera.lat - 50 * degPerMeterLat, speedKmh = 3.0, bearing = null, timeMs = 20_000),
+            )
+        assertTrue(queued.isEmpty(), "remembered bearing must keep the bearing filter alive, got $queued")
+    }
+
+    @Test
+    fun `bearing memory expires so a long stop falls back to fail-open`() {
+        val engine = AlertEngine(listOf(camera))
+        assertTrue(engine.onFix(fix(camera.lat + 400 * degPerMeterLat, bearing = 0.0, timeMs = 0)).isEmpty())
+        val stale = AlertEngine.BEARING_MEMORY_MS + 1_000
+        val crawling =
+            engine.onFix(
+                fix(camera.lat + 100 * degPerMeterLat, speedKmh = 10.0, bearing = null, timeMs = stale),
+            )
+        assertEquals(1, crawling.size, "with no fresh bearing the direction is unknown: alert (fail-safe)")
+    }
+
+    @Test
+    fun `remembered matching bearing still alerts while crawling`() {
+        val engine = AlertEngine(listOf(camera))
+        assertTrue(engine.onFix(fix(camera.lat + 400 * degPerMeterLat, timeMs = 0)).isEmpty())
+        val crawling =
+            engine.onFix(
+                fix(camera.lat + 250 * degPerMeterLat, speedKmh = 5.0, bearing = null, timeMs = 30_000),
+            )
+        assertEquals(1, crawling.size)
+    }
+
+    // ---- accuracy gate --------------------------------------------------------
+
+    @Test
+    fun `an untrusted fix inside the ring does not fire`() {
+        val engine = AlertEngine(listOf(camera))
+        // Network fallback in a canyon: no speed, no bearing, 500 m accuracy.
+        val network =
+            engine.onFix(
+                fix(camera.lat + 150 * degPerMeterLat, speedKmh = 0.0, bearing = null, accuracy = 500.0),
+            )
+        assertTrue(network.isEmpty(), "a 500 m-accuracy point must not fire, got $network")
+        assertTrue(engine.nearestCamera == null)
+        // GPS back: the same approach fires normally.
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+    }
+
+    @Test
+    fun `the no-accuracy sentinel still resolves the pass`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        val passed = engine.onFix(fix(camera.lat - 100 * degPerMeterLat, accuracy = 99.0))
+        assertEquals(listOf<AlertEvent>(AlertEvent.AllClear(camera)), passed)
+    }
+
+    // ---- camera-axis pass test ----------------------------------------------
+
+    @Test
+    fun `hairpin apex heading away does not fake the all clear`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // Apex of a hairpin: 100 m north and 150 m east of the camera, heading
+        // east. By travel bearing the camera is in the rear half-plane; by the
+        // camera's own axis the rider is still upstream.
+        val apex =
+            engine.onFix(
+                fix(camera.lat + 100 * degPerMeterLat, bearing = 90.0, lon = camera.lon + 150 * degPerMeterLon),
+            )
+        assertTrue(apex.isEmpty(), "camera still ahead by road must not clear, got $apex")
+        assertTrue(engine.activeAlert != null)
+        // Down the second leg past the camera: now clear.
+        assertEquals(
+            listOf<AlertEvent>(AlertEvent.AllClear(camera)),
+            engine.onFix(fix(camera.lat - 100 * degPerMeterLat)),
+        )
+    }
+
+    @Test
+    fun `a fix right at the camera decides nothing about the pass`() {
+        val engine = AlertEngine(listOf(camera))
+        assertEquals(1, engine.onFix(fix(camera.lat + 150 * degPerMeterLat)).size)
+        // 10 m past the camera: the camera→rider bearing is noise at that range.
+        assertTrue(engine.onFix(fix(camera.lat - 10 * degPerMeterLat)).isEmpty())
+        assertEquals(
+            listOf<AlertEvent>(AlertEvent.AllClear(camera)),
+            engine.onFix(fix(camera.lat - 40 * degPerMeterLat)),
+        )
     }
 
     private val degPerMeterLon = 1.0 / 101_560.0

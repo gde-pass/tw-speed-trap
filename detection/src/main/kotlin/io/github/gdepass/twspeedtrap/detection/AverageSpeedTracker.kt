@@ -41,7 +41,23 @@ class AverageSpeedTracker(
         val exit: Camera,
         val entryTimeMs: Long,
         var warned: Boolean = false,
-    )
+    ) {
+        /** Straight-line entry→exit distance; the road is [Section.lengthM] long. */
+        private val chordM = GeoMath.distanceMeters(entry.lat, entry.lon, exit.lat, exit.lon)
+
+        /**
+         * Road distance still to ride, from the straight-line distance to the
+         * exit. A curved section is longer than its chord (壽卡: 6.0 km of road
+         * on a 3.5 km chord), so projecting the straight-line remainder at
+         * the current speed would overstate the average by the same ratio and
+         * warn a rider holding exactly the limit. Scaling by length/chord is
+         * exact at both gantries and the only honest estimate in between.
+         */
+        fun remainingRoadM(remainingM: Double): Double {
+            if (chordM < 1.0) return remainingM
+            return (remainingM * section.lengthM / chordM).coerceIn(0.0, section.lengthM)
+        }
+    }
 
     /** Fixes inside an entry ball whose direction of travel is not yet known. */
     private class PendingEntry(
@@ -108,9 +124,7 @@ class AverageSpeedTracker(
             return
         }
         val remainingM = GeoMath.distanceMeters(fix.lat, fix.lon, traversal.exit.lat, traversal.exit.lon)
-        val projectedKmh =
-            (traversal.section.lengthM / (elapsedS + remainingM / fix.speedMps) * MPS_TO_KMH).roundToInt()
-        liveStatus = traversal.section to projectedKmh
+        liveStatus = traversal.section to projectedKmh(traversal, fix, elapsedS, remainingM)
     }
 
     private fun updateBearingMemory(fix: Fix) {
@@ -203,11 +217,21 @@ class AverageSpeedTracker(
         remainingM: Double,
     ): List<AlertEvent>? {
         if (traversal.warned || fix.speedMps <= 1.0) return null
-        val projectedTotalS = elapsedS + remainingM / fix.speedMps
-        val projectedKmh = (traversal.section.lengthM / projectedTotalS * MPS_TO_KMH).roundToInt()
+        val projectedKmh = projectedKmh(traversal, fix, elapsedS, remainingM)
         if (projectedKmh <= traversal.section.speedLimitKmh + config.speedToleranceKmh) return null
         traversal.warned = true
         return listOf(AlertEvent.SectionOverPace(traversal.section, projectedKmh))
+    }
+
+    /** Section average the rider is heading for if the current speed is held to the exit. */
+    private fun projectedKmh(
+        traversal: Traversal,
+        fix: Fix,
+        elapsedS: Double,
+        remainingM: Double,
+    ): Int {
+        val projectedTotalS = elapsedS + traversal.remainingRoadM(remainingM) / fix.speedMps
+        return (traversal.section.lengthM / projectedTotalS * MPS_TO_KMH).roundToInt()
     }
 
     private fun abandon(): List<AlertEvent> {
