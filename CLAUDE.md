@@ -10,11 +10,18 @@
 - `adb root` works on the AVD — start the non-exported service directly (`am start-foreground-service -n io.github.gdepass.twspeedtrap/.service.DetectionService`, append `-a io.github.gdepass.twspeedtrap.STOP` to stop) after `pm grant`ing location perms; no UI tapping needed
 - Simulated drive: `adb emu geo fix <lon> <lat>` at 1 Hz, lat step 0.00015°/s ≈ 60 km/h; check audio focus via the `twspeedtrap` entry in `dumpsys audio`'s focus stack
 - Emulator TTS synthesizes but playback stalls, so utterance callbacks never fire — good for reproducing callback-loss bugs, useless for verifying normal TTS completion
+- Launching the emulator from a Claude Code session does not work (2026-10): `emulator -avd …` segfaults (exit 139) under the Bash sandbox and hangs then dies unsandboxed too, with or without `-no-window -crash-report-mode never -no-metrics`. Boot it from Android Studio / a terminal first, or hand on-device checks to Greg — don't spend a session fighting it
+- The chained gradle command runs detekt before the tests finish reporting: after a red detekt the `test-results/*.xml` are stale from the previous run, so a "N tests, 0 failures" print right after a detekt failure means nothing — fix detekt, re-run, then read the count
+- As of v1.5.1: 142 JVM tests (detection + app) and 108 pipeline tests; `docs/audit-2026-10.md` is the finding index with per-release status — add new findings there rather than starting a new document
+- Auditing: one read-only agent per layer (service/audio, UI, data/update, detection) in parallel found 70 findings in ~10 min; re-verify every S1 claim against the code yourself before acting (all held), and keep "verify on device" on claims about platform behaviour you can't reproduce here (the Android 12+ fine-without-coarse one)
 
 ## Lint constraints
 - detekt: `ReturnCount` max 4 (merge guards / use `when`), MagicNumber off, comments ruleset off
 - detekt `ComplexCondition` fires at 4 boolean operands — keep conditions ≤3, hoist a named local
 - After post-commit lint fixes, check `git status` is clean before pushing — path-scoped commits have missed follow-up edits (cost one red CI run)
+- Also hit this session: `LongMethod` at 60 lines (extract a `publish(...)`-style helper), `CyclomaticComplexMethod` at 15 (split a long Composable into section Composables), `MaxLineLength` applies to test sources too (break long URL literals with `+`)
+- Editing Kotlin from python scripts: `ktlintFormat` rewraps multi-line calls, so an `old` string written from memory of your own previous edit often no longer matches — print the current region first; a failed `assert` mid-script leaves that script's files untouched (writes are at the end), so just fix and re-run the whole script
+- Appending tests to AlertEngineTest: its last member is `private val degPerMeterLon`; append *before* it or you get a duplicate declaration (happened twice)
 
 ## Release & data protocol
 - `appVersion` in app/build.gradle.kts must match the tag (`v$appVersion`); versionCode = major·10000 + minor·100 + patch
@@ -26,6 +33,9 @@
 - Release workflow publishes only a bare changelog link — after it's green, add real notes with `gh release edit vX.Y.Z --notes` (match prior releases' tone: rider-facing bullets + test count)
 - A green data-update always commits its own snapshot (db sha changes per run) even when its content_hash equals the local build — `git pull --ff-only origin main` before pushing again
 - Run `gh workflow run` on its own with a short timeout (it hung >2 min chained after a push), then poll with a background `until`-loop on `gh run view --json status`; `gh run watch` blew a 10-min timeout once
+- Polling two runs in zsh: `ids=($(gh run list --json databaseId,name,headBranch --jq … | awk '$3=="vX.Y.Z" || ($2=="CI" && $3=="main") {print $1}'))` — a plain `ids=$(…)` is one unsplit word and every `gh run view $ids` 404s. Tag runs show `headBranch == "vX.Y.Z"`; CI runs show `main`
+- Cadence that worked: one release per fix batch, version bump in the same commit as the fix, `git pull --rebase -X theirs` → push → tag → push tag in one chained command, then `gh release edit vX.Y.Z --title vX.Y.Z --notes-file -` with a heredoc once the Release run is green (≈6 min after the tag)
+- `gh secret set NAME --repo … < file` works from here; repository secrets are available to `schedule` runs (environment secrets would need `environment:` on the job)
 
 ## Pipeline data sources
 - The weekly job's usual failure is an upstream header rename (135957 moved to the county template + Big5, 172940 dropped a suffix): read the SchemaError's `found` list in `gh run view --log-failed`, fix with a candidate-column list (first present wins, none present still raises) as in `_parse_county_standard`, and copy verbatim live rows into the test fixture
@@ -54,6 +64,8 @@
 - `AlertEngine` refuses a config whose re-arm ring exceeds `GridIndex.MIN_COVERAGE_M` (1 km) — keep the settings sliders ≤ 600 m with rearmFactor 1.5
 - `BluetoothAutoStartReceiver` is a toggled component (`setComponentEnabled`, synced in Application.onCreate and from the setting) and honours the `autoStartBluetoothDevices` allow-list (empty = any device); `TapToStart.post` returns false when notifications are blocked
 - `Fix.timestampMs` from `LocationSource` is the boot clock (`elapsedRealtimeNanos`), never wall time, and every fix of a batched result is delivered
+- `ManualUpdateCheck` (process-scoped StateFlow) owns "Check for update now" so rotation/back can't lose a running download; `DetectionStatus.starting` gates the Start button until the db has loaded; MainScreen shows one permission card at a time, most important first
+- Settings screen renders nothing until the first DataStore emission (`initialValue = null`) — never reintroduce `initialValue = AppSettings()` (switches jumped, and a reschedule read the defaults)
 - Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + a 500 ms `tts.isSpeaking()` poll backstop with a 30 s hard cap) — never a single last-utterance-id gate, never a fixed long timeout as the only fallback (music stayed ducked 30 s whenever onDone was lost)
 
 ## Tooling quirks
