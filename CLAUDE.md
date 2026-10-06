@@ -21,6 +21,7 @@
 - Release workflow rejects APKs not signed with cert sha256 `52e0e492f49e3662b14a36ba2ad1f236af078c65c70b3514369ca70c10e0da1e`
 - Bot data commits race pushes: recover with `git pull --rebase -X theirs origin main`, and create/move tags **after** rebasing (a pre-rebase tag points at a dangling commit and the release builds from it)
 - Publish gate is `content_hash` (excludes last_seen); the db file's sha256 changes every run by design
+- `manifest.json` is signed (P-256, `openssl dgst -sha256 -sign`) by the data-update workflow with the `MANIFEST_SIGNING_KEY` repo secret; the public half is `.github/manifest-signing-key.pub.pem` and is compiled into `UpdateVerifier` — apps ≥ 1.5.0 reject an unsigned or mis-signed manifest as a permanent failure. The private key lives only in the secret and in `~/.twspeedtrap/manifest-signing-key.pem` on Greg's Mac (back it up; losing it means a new key + a new app release before updates resume). To publish by hand: sign with that key and upload `manifest.json.sig` with `gh release upload data … --clobber`, db first, manifest + sig last
 - If data changed: dispatch data-update.yml, don't push main while it runs, wait for green
 - Release workflow publishes only a bare changelog link — after it's green, add real notes with `gh release edit vX.Y.Z --notes` (match prior releases' tone: rider-facing bullets + test count)
 - A green data-update always commits its own snapshot (db sha changes per run) even when its content_hash equals the local build — `git pull --ff-only origin main` before pushing again
@@ -46,6 +47,9 @@
 - Blind detection must never look protected: `gpsStale` (no fix for 8 s or provider unavailable) renders as NoGps in the bubble and as a red warning on the main screen
 - The TTS voice follows the locale the strings resolve to (`LocaleOverride.speechLocale`), never the raw device locale — a zh-TW phone reads English strings with an English voice
 - Implicit system intents go through `Context.startActivitySafely`; fine location is always requested together with coarse (Android 12+ ignores fine alone); a permission denied without rationale switches the card to "Open app settings"
+- Update path: signature → schema == SUPPORTED → version format → trusted URL (normalised) → newer? → download → sha256 → `CameraRepository.probe` (the real queries) + meta match → fsync + rename, all under one process-wide Mutex; bad published data is `permanent = true` (no re-download retries), only network errors retry
+- `CameraRepository.ensureDatabase` replaces the local db with the bundled one once per app version when the bundled `data_version` is newer (auto-update off must not mean install-day data forever)
+- The About screen's dataset list is `about_attribution_datasets` (non-translatable, single-sourced); `pipeline/tests/test_attribution.py` fails when it drifts from `cli.DATASETS`
 - Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + a 500 ms `tts.isSpeaking()` poll backstop with a 30 s hard cap) — never a single last-utterance-id gate, never a fixed long timeout as the only fallback (music stayed ducked 30 s whenever onDone was lost)
 
 ## Tooling quirks

@@ -4,6 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.KeyPairGenerator
+import java.security.Signature
+import java.security.spec.ECGenParameterSpec
+import java.util.Base64
 
 class UpdateVerifierTest {
     @Test
@@ -74,5 +78,60 @@ class UpdateVerifierTest {
             ),
         )
         assertFalse(UpdateVerifier.isTrustedUrl("not a url"))
+    }
+
+    @Test
+    fun `dot segments cannot escape the trusted download prefix`() {
+        assertFalse(
+            UpdateVerifier.isTrustedUrl(
+                "https://github.com/gde-pass/tw-speed-trap/releases/download/" +
+                    "../../../other/repo/releases/download/x.db",
+            ),
+        )
+        assertFalse(
+            UpdateVerifier.isTrustedUrl("https://user@github.com/gde-pass/tw-speed-trap/releases/download/data/x.db"),
+        )
+    }
+
+    // ---- manifest signature ------------------------------------------------
+
+    private fun p256KeyPair() =
+        KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
+
+    private fun sign(
+        bytes: ByteArray,
+        key: java.security.PrivateKey,
+    ): ByteArray =
+        Signature.getInstance("SHA256withECDSA").run {
+            initSign(key)
+            update(bytes)
+            sign()
+        }
+
+    @Test
+    fun `a manifest signed by the matching key verifies`() {
+        val pair = p256KeyPair()
+        val manifest = """{"schema_version":1}""".toByteArray()
+        assertTrue(UpdateVerifier.verifySignature(manifest, sign(manifest, pair.private), pair.public))
+    }
+
+    @Test
+    fun `a tampered manifest or a foreign key does not verify`() {
+        val pair = p256KeyPair()
+        val manifest = """{"schema_version":1,"count":2774}""".toByteArray()
+        val signature = sign(manifest, pair.private)
+        val tampered = """{"schema_version":1,"count":2775}""".toByteArray()
+        assertFalse(UpdateVerifier.verifySignature(tampered, signature, pair.public))
+        assertFalse(UpdateVerifier.verifySignature(manifest, signature, p256KeyPair().public))
+        assertFalse(UpdateVerifier.verifySignature(manifest, byteArrayOf(1, 2, 3), pair.public))
+        assertFalse(UpdateVerifier.verifySignature(manifest, ByteArray(0), pair.public))
+    }
+
+    @Test
+    fun `the compiled-in public key decodes and round-trips through PEM encoding`() {
+        val key = UpdateVerifier.manifestPublicKey
+        assertEquals("EC", key.algorithm)
+        val pem = Base64.getEncoder().encodeToString(key.encoded)
+        assertEquals(key, UpdateVerifier.decodePublicKey(pem))
     }
 }

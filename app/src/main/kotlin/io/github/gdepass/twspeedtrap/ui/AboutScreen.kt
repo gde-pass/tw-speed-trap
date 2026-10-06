@@ -89,7 +89,10 @@ fun AboutScreen(onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.about_attribution_body), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                stringResource(R.string.about_attribution_body, stringResource(R.string.about_attribution_datasets)),
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Spacer(Modifier.height(6.dp))
             // Attribution required by 政府資料開放授權條款第1版 — keep verbatim.
             Text("資料來源：政府資料開放平臺 (data.gov.tw)", style = MaterialTheme.typography.bodyMedium)

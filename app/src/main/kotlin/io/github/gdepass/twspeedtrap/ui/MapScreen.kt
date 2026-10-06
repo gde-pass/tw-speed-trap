@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,6 +66,8 @@ private val LEGEND_LABELS =
         CameraType.RED_LIGHT to R.string.type_red_light,
         CameraType.TECH to R.string.type_tech,
         CameraType.SECTION to R.string.type_section,
+        CameraType.MOBILE to R.string.type_mobile,
+        CameraType.OTHER to R.string.type_other,
     )
 
 /** Read-only coverage map: the camera database rendered on OSM tiles. */
@@ -130,21 +133,25 @@ fun MapScreen(onBack: () -> Unit) {
                 }
             },
         )
-        FloatingActionButton(
-            onClick = onBack,
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(16.dp),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+        // The map itself runs edge to edge; the controls must not sit under
+        // the status bar or the navigation bar.
+        Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+            FloatingActionButton(
+                onClick = onBack,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+            }
+            Legend(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = 16.dp),
+            )
         }
-        Legend(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 24.dp),
-        )
     }
 }
 
@@ -163,13 +170,13 @@ private fun Legend(modifier: Modifier = Modifier) {
                 Box(
                     modifier =
                         Modifier
-                            .padding(end = 6.dp)
-                            .size(10.dp)
+                            .padding(end = 8.dp)
+                            .size(12.dp)
                             .background(TYPE_COLORS.getValue(type), CircleShape),
                 )
                 Text(
                     stringResource(label),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }

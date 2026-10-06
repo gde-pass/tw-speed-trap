@@ -35,9 +35,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,7 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.gdepass.twspeedtrap.R
 import io.github.gdepass.twspeedtrap.data.AppSettings
 import io.github.gdepass.twspeedtrap.data.CameraRepository
-import io.github.gdepass.twspeedtrap.data.DbUpdater
+import io.github.gdepass.twspeedtrap.data.ManualUpdateCheck
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.data.UpdateResult
 import io.github.gdepass.twspeedtrap.data.UpdateWorker
@@ -63,6 +64,7 @@ import io.github.gdepass.twspeedtrap.util.startActivitySafely
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(
@@ -129,24 +131,25 @@ fun SettingsScreen(
             SwitchRow(stringResource(R.string.settings_all_clear_chime), settings.allClearChimeEnabled) {
                 scope.launch { repository.setAllClearChimeEnabled(it) }
             }
+            val res = LocalContext.current.resources
             SliderRow(
-                label = stringResource(R.string.settings_alert_distance, settings.alertDistanceM),
+                label = { res.getString(R.string.settings_alert_distance, it) },
                 value = settings.alertDistanceM.toFloat(),
                 range = 100f..600f,
                 steps = 9,
-            ) { scope.launch { repository.setAlertDistance(it.toInt()) } }
+            ) { scope.launch { repository.setAlertDistance(it.roundToInt()) } }
             SliderRow(
-                label = stringResource(R.string.settings_alert_distance_high, settings.highSpeedAlertDistanceM),
+                label = { res.getString(R.string.settings_alert_distance_high, it) },
                 value = settings.highSpeedAlertDistanceM.toFloat(),
                 range = 200f..600f,
                 steps = 7,
-            ) { scope.launch { repository.setHighSpeedAlertDistance(it.toInt()) } }
+            ) { scope.launch { repository.setHighSpeedAlertDistance(it.roundToInt()) } }
             SliderRow(
-                label = stringResource(R.string.settings_tolerance, settings.speedToleranceKmh),
+                label = { res.getString(R.string.settings_tolerance, it) },
                 value = settings.speedToleranceKmh.toFloat(),
                 range = 0f..20f,
                 steps = 19,
-            ) { scope.launch { repository.setSpeedTolerance(it.toInt()) } }
+            ) { scope.launch { repository.setSpeedTolerance(it.roundToInt()) } }
             OverlayBubbleSetting(settings.overlayBubbleEnabled) { enabled ->
                 scope.launch { repository.setOverlayBubbleEnabled(enabled) }
             }
@@ -195,34 +198,28 @@ fun SettingsScreen(
                     UpdateWorker.schedule(context.applicationContext, settings.autoUpdateEnabled, it)
                 }
             }
-            var checking by remember { mutableStateOf(false) }
-            var updateStatus by remember { mutableStateOf<String?>(null) }
+            // Process-scoped: rotating or leaving the screen must not discard
+            // a check that is still downloading, nor its result.
+            val check by ManualUpdateCheck.state.collectAsStateWithLifecycle()
+            LaunchedEffect(check.completedCount) { if (check.completedCount > 0) metaRefresh++ }
             val strings = LocalContext.current.resources
             Button(
-                enabled = !checking,
-                onClick = {
-                    scope.launch {
-                        checking = true
-                        updateStatus = null
-                        val result = DbUpdater(context.applicationContext).checkAndUpdate()
-                        updateStatus =
-                            when (result) {
-                                UpdateResult.UpToDate -> strings.getString(R.string.update_result_uptodate)
-                                is UpdateResult.Updated ->
-                                    strings.getString(R.string.update_result_updated, result.dataVersion, result.count)
-                                is UpdateResult.Failed ->
-                                    strings.getString(R.string.update_result_failed, result.reason)
-                            }
-                        metaRefresh++
-                        checking = false
-                    }
-                },
+                enabled = !check.running,
+                onClick = { ManualUpdateCheck.start(context.applicationContext) },
             ) {
-                Text(stringResource(if (checking) R.string.update_checking else R.string.update_check_now))
+                Text(stringResource(if (check.running) R.string.update_checking else R.string.update_check_now))
             }
-            updateStatus?.let {
+            check.result?.let { result ->
                 Spacer(Modifier.height(6.dp))
-                Text(it, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    when (result) {
+                        UpdateResult.UpToDate -> strings.getString(R.string.update_result_uptodate)
+                        is UpdateResult.Updated ->
+                            strings.getString(R.string.update_result_updated, result.dataVersion, result.count)
+                        is UpdateResult.Failed -> strings.getString(R.string.update_result_failed, result.reason)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
 
             SectionTitle(stringResource(R.string.settings_voice))
@@ -371,17 +368,27 @@ private fun SwitchRow(
     }
 }
 
+/** The thumb follows the finger from local state; the value is persisted
+ * once the drag ends. Persisting on every frame rewrote the settings file
+ * dozens of times a second and made the thumb lag behind the touch. */
 @Composable
 private fun SliderRow(
-    label: String,
+    label: (Int) -> String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int,
     onChange: (Float) -> Unit,
 ) {
+    var local by remember(value) { mutableFloatStateOf(value) }
     Column(modifier = Modifier.padding(vertical = 6.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps)
+        Text(label(local.roundToInt()), style = MaterialTheme.typography.bodyLarge)
+        Slider(
+            value = local,
+            onValueChange = { local = it },
+            onValueChangeFinished = { onChange(local) },
+            valueRange = range,
+            steps = steps,
+        )
     }
 }
 

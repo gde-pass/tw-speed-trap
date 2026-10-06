@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,12 +44,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.gdepass.twspeedtrap.R
+import io.github.gdepass.twspeedtrap.detection.CameraType
 import io.github.gdepass.twspeedtrap.service.DetectionService
 import io.github.gdepass.twspeedtrap.service.DetectionStatus
 import io.github.gdepass.twspeedtrap.util.appSettingsIntent
@@ -116,7 +119,9 @@ fun MainScreen(
         ) {
             Spacer(Modifier.height(12.dp))
             StatusRow(state, onOpenSettings, onOpenMap)
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
+            LiveBanner(state)
+            Spacer(Modifier.height(16.dp))
             SpeedDisplay(state)
             Spacer(Modifier.height(24.dp))
 
@@ -268,6 +273,9 @@ private fun StatusRow(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (state.running) {
@@ -292,6 +300,60 @@ private fun StatusRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * The one line a rider reads at a glance: a fired camera (red), a section
+ * average in progress (amber), blind detection (red) or a missing voice
+ * (amber). The bubble shows all of these; the main screen did not.
+ */
+@Composable
+private fun LiveBanner(state: DetectionStatus.UiState) {
+    val alert = state.activeAlert
+    val section = state.activeSection
+    val (text, color) =
+        when {
+            !state.running -> return
+            state.locationOff -> stringResource(R.string.gps_disabled_warning) to MaterialTheme.colorScheme.error
+            state.gpsStale && state.accuracyM != null ->
+                stringResource(R.string.gps_lost_warning) to MaterialTheme.colorScheme.error
+            alert != null -> alertBannerText(alert) to MaterialTheme.colorScheme.error
+            section != null ->
+                stringResource(R.string.banner_section, section.speedLimitKmh, section.projectedAverageKmh) to
+                    MaterialTheme.colorScheme.secondary
+            state.voiceMissing -> stringResource(R.string.voice_missing_warning) to MaterialTheme.colorScheme.secondary
+            else -> return
+        }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = color, contentColor = MaterialTheme.colorScheme.onError),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        )
+    }
+}
+
+@Composable
+private fun alertBannerText(alert: DetectionStatus.ActiveAlert): String {
+    val type =
+        stringResource(
+            when (alert.type) {
+                CameraType.RED_LIGHT -> R.string.type_red_light
+                CameraType.TECH -> R.string.type_tech
+                CameraType.MOBILE -> R.string.type_mobile
+                CameraType.SECTION -> R.string.type_section
+                else -> R.string.type_fixed
+            },
+        )
+    return if (alert.speedLimitKmh != null) {
+        stringResource(R.string.banner_alert_limit, type, alert.distanceM, alert.speedLimitKmh)
+    } else {
+        stringResource(R.string.banner_alert, type, alert.distanceM)
     }
 }
 

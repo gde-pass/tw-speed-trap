@@ -27,22 +27,70 @@ class CameraRepository(
 
     fun ensureDatabase(): File {
         val file = databaseFile()
-        if (!file.exists()) copyBundled(file)
+        if (!file.exists()) copyBundled(file) else refreshFromBundledOnce(file)
         return file
     }
 
+    /**
+     * An app update ships a fresh bundled db, but the local copy from install
+     * day would otherwise live on forever (auto-update off, or a schema bump
+     * the old file predates). Once per app version, if the bundled data is
+     * newer than the local file, it replaces it.
+     */
+    private fun refreshFromBundledOnce(local: File) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val versionCode = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+        if (prefs.getLong(KEY_CHECKED_VERSION, -1L) == versionCode) return
+        val tmp = File(local.parentFile, "${local.name}.asset-tmp")
+        runCatching {
+            copyBundledTo(tmp)
+            val bundledVersion = readVersionOf(tmp)
+            val localVersion = runCatching { readVersionOf(local) }.getOrNull()
+            if (UpdateVerifier.isNewer(bundledVersion, localVersion)) {
+                Log.i(TAG, "bundled data $bundledVersion is newer than local $localVersion — replacing")
+                check(tmp.renameTo(local)) { "could not replace $DB_NAME with the bundled copy" }
+            }
+        }.onFailure { Log.w(TAG, "bundled-data refresh check failed", it) }
+        tmp.delete()
+        prefs.edit().putLong(KEY_CHECKED_VERSION, versionCode).apply()
+    }
+
+    private fun readVersionOf(file: File): String =
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT value FROM meta WHERE key = 'data_version'", null).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else ""
+            }
+        }
+
     /** tmp + fsync + rename: the final path never holds a partial file. */
     private fun copyBundled(target: File) {
-        target.parentFile?.mkdirs()
         val tmp = File(target.parentFile, "${target.name}.asset-tmp")
+        copyBundledTo(tmp)
+        check(tmp.renameTo(target)) { "could not install bundled $DB_NAME" }
+    }
+
+    private fun copyBundledTo(file: File) {
+        file.parentFile?.mkdirs()
         context.assets.open(DB_NAME).use { input ->
-            FileOutputStream(tmp).use { output ->
+            FileOutputStream(file).use { output ->
                 input.copyTo(output)
                 output.fd.sync()
             }
         }
-        check(tmp.renameTo(target)) { "could not install bundled $DB_NAME" }
     }
+
+    /**
+     * Runs the exact queries detection runs against a candidate file (no
+     * fallback, no retry): the only validation that proves a downloaded db
+     * will load. Returns the camera and section counts.
+     */
+    fun probe(file: File): Pair<Int, Int> =
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            readCameras(db).size to readSections(db).size
+        }
+
+    fun metadataOf(file: File): Map<String, String> =
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use(::readMeta)
 
     /** Both tables from one open, so a self-update landing between the two
      * reads cannot pair cameras of one data generation with sections of another. */
@@ -52,12 +100,12 @@ class CameraRepository(
 
     fun loadSections(): Map<String, Section> = read(::readSections)
 
-    fun metadata(): Map<String, String> =
-        read { db ->
-            db.rawQuery("SELECT key, value FROM meta", null).use { cursor ->
-                buildMap {
-                    while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1))
-                }
+    fun metadata(): Map<String, String> = read(::readMeta)
+
+    private fun readMeta(db: SQLiteDatabase): Map<String, String> =
+        db.rawQuery("SELECT key, value FROM meta", null).use { cursor ->
+            buildMap {
+                while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1))
             }
         }
 
@@ -121,5 +169,7 @@ class CameraRepository(
     companion object {
         const val DB_NAME = "cameras.db"
         private const val TAG = "CameraRepository"
+        private const val PREFS = "camera_db"
+        private const val KEY_CHECKED_VERSION = "bundled_checked_for_version_code"
     }
 }

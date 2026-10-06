@@ -76,6 +76,28 @@ jobs:
             done
           fi
 
+      - name: Sign manifest
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          MANIFEST_SIGNING_KEY: ${{ secrets.MANIFEST_SIGNING_KEY }}
+        run: |
+          # The app (v1.5.0+) trusts a manifest only with a P-256 signature
+          # from this key; without it every install would reject the update,
+          # so a missing secret is a hard failure, not a silent skip.
+          if [ -z "$MANIFEST_SIGNING_KEY" ]; then
+            echo "::error::MANIFEST_SIGNING_KEY secret is not set"
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$MANIFEST_SIGNING_KEY" > "$RUNNER_TEMP/signing-key.pem"
+          openssl dgst -sha256 -sign "$RUNNER_TEMP/signing-key.pem" \
+            -out pipeline/out/manifest.json.sig pipeline/out/manifest.json
+          rm -f "$RUNNER_TEMP/signing-key.pem"
+          # Verify with the public key the app compiles in, so a key mix-up
+          # fails here rather than on every phone.
+          openssl dgst -sha256 -verify .github/manifest-signing-key.pub.pem \
+            -signature pipeline/out/manifest.json.sig pipeline/out/manifest.json
+
       - name: Publish release assets
         if: steps.diff.outputs.changed == 'true'
         env:
@@ -86,4 +108,7 @@ jobs:
           gh release view data >/dev/null 2>&1 || \
             gh release create data --prerelease --title "Camera data" \
               --notes "Rolling camera-database release. Assets are replaced in place by the weekly data-update workflow."
-          gh release upload data pipeline/out/cameras.db pipeline/out/manifest.json --clobber
+          # db first, then manifest, then signature: a reader that sees a new
+          # manifest with the old signature fails verification and retries.
+          gh release upload data pipeline/out/cameras.db --clobber
+          gh release upload data pipeline/out/manifest.json pipeline/out/manifest.json.sig --clobber
