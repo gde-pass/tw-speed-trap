@@ -37,7 +37,7 @@
 - Null camera bearing = alert both directions (fail-safe); dedupe/merges must never narrow a null bearing
 - Missing source columns raise SchemaError; unresolved/suppressed rows are always counted, never silent
 - The overlay bubble must come down when the app's last activity is destroyed: an overlay window pins the process at perceptible oom_adj (200), so a bubble that outlives its app is never reclaimed and only the settings toggle can kill it
-- Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + watchdog) — never a single last-utterance-id gate
+- Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + a 500 ms `tts.isSpeaking()` poll backstop with a 30 s hard cap) — never a single last-utterance-id gate, never a fixed long timeout as the only fallback (music stayed ducked 30 s whenever onDone was lost)
 
 ## Tooling quirks
 - The rtk hook sometimes mangles grep/head output — fall back to `python3 -c` one-liners for text extraction

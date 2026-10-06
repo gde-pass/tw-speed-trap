@@ -90,4 +90,53 @@ class FocusLedgerTest {
         ledger.complete("c")
         assertEquals(1, abandons)
     }
+
+    @Test
+    fun `isHolding tracks the request and its abandon`() {
+        assertFalse(ledger.isHolding)
+        ledger.announce { listOf("a") }
+        assertTrue(ledger.isHolding)
+        ledger.complete("a")
+        assertFalse(ledger.isHolding)
+    }
+
+    @Test
+    fun `backstop keeps focus while the engine is still speaking`() {
+        assertFalse(FocusLedger.shouldForceRelease(engineSpeaking = true, startSeen = true, sinceEnqueueMs = 10_000))
+        assertFalse(FocusLedger.shouldForceRelease(engineSpeaking = true, startSeen = false, sinceEnqueueMs = 10_000))
+    }
+
+    @Test
+    fun `backstop releases as soon as a started utterance goes idle`() {
+        assertTrue(FocusLedger.shouldForceRelease(engineSpeaking = false, startSeen = true, sinceEnqueueMs = 500))
+    }
+
+    @Test
+    fun `backstop gives a never-started utterance a grace period`() {
+        assertFalse(
+            FocusLedger.shouldForceRelease(
+                engineSpeaking = false,
+                startSeen = false,
+                sinceEnqueueMs = FocusLedger.START_GRACE_MS - 1,
+            ),
+        )
+        assertTrue(
+            FocusLedger.shouldForceRelease(
+                engineSpeaking = false,
+                startSeen = false,
+                sinceEnqueueMs = FocusLedger.START_GRACE_MS,
+            ),
+        )
+    }
+
+    @Test
+    fun `backstop hard cap releases even a busy engine`() {
+        assertTrue(
+            FocusLedger.shouldForceRelease(
+                engineSpeaking = true,
+                startSeen = false,
+                sinceEnqueueMs = FocusLedger.HARD_CAP_MS,
+            ),
+        )
+    }
 }

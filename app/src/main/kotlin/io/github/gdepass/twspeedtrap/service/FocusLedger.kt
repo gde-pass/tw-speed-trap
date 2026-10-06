@@ -18,6 +18,9 @@ class FocusLedger(
     private val inFlight = mutableSetOf<String>()
     private var holding = false
 
+    /** True between the focus request and its abandon. */
+    val isHolding: Boolean get() = synchronized(lock) { holding }
+
     /**
      * Requests focus, runs [enqueue] (returning the utterance ids the TTS
      * engine actually accepted), and tracks them. If nothing was accepted
@@ -51,7 +54,7 @@ class FocusLedger(
         }
     }
 
-    /** Watchdog / shutdown path: drops all bookkeeping and abandons focus if
+    /** Backstop / shutdown path: drops all bookkeeping and abandons focus if
      * still held. Safe to call when idle. */
     fun forceRelease() {
         synchronized(lock) {
@@ -61,5 +64,38 @@ class FocusLedger(
                 holding = false
             }
         }
+    }
+
+    companion object {
+        /** Before the engine has reported a start, an idle engine is trusted
+         * only this long after the enqueue: speak() returns before the engine
+         * has picked the utterance up, and a cold engine loads its voice first. */
+        const val START_GRACE_MS = 3_000L
+
+        /** Absolute ceiling on one announcement's focus hold, whatever the
+         * engine reports (another app may keep the shared engine busy). */
+        const val HARD_CAP_MS = 30_000L
+
+        /**
+         * Backstop decision, polled while focus is held, for engines whose
+         * completion callbacks arrive late or never: the engine's own
+         * speaking state is the source of truth once it has stopped. Pure so
+         * the policy is unit-testable; [Announcer] feeds it the clock and
+         * `TextToSpeech.isSpeaking()`.
+         *
+         * @param engineSpeaking what the engine reports right now.
+         * @param startSeen whether any onStart callback arrived since the last enqueue.
+         * @param sinceEnqueueMs time since the most recent successful enqueue.
+         */
+        fun shouldForceRelease(
+            engineSpeaking: Boolean,
+            startSeen: Boolean,
+            sinceEnqueueMs: Long,
+        ): Boolean =
+            when {
+                sinceEnqueueMs >= HARD_CAP_MS -> true
+                engineSpeaking -> false
+                else -> startSeen || sinceEnqueueMs >= START_GRACE_MS
+            }
     }
 }

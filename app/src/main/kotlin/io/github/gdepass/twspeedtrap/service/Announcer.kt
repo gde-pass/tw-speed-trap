@@ -6,6 +6,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -18,6 +19,12 @@ import java.util.Locale
  * USAGE_ASSISTANCE_NAVIGATION_GUIDANCE + transient-may-duck focus is what
  * makes music duck instead of stopping, and keeps alerts audible over
  * Bluetooth while Android Auto owns the media stream.
+ *
+ * Focus is held exactly as long as the engine is busy with our utterances:
+ * the per-utterance callbacks release it the moment the last one completes,
+ * and a poll of the engine's speaking state backs them up, so a lost or late
+ * callback un-ducks the music within [BACKSTOP_POLL_MS] instead of leaving it
+ * quiet until a long timeout.
  */
 class Announcer(
     private val context: Context,
@@ -51,11 +58,30 @@ class Announcer(
             abandonFocus = { audioManager.abandonAudioFocusRequest(focusRequest) },
         )
 
-    /** Backstop for a TTS engine that dies mid-utterance and never calls back. */
-    private val watchdog =
-        Runnable {
-            Log.w(TAG, "utterance callbacks never arrived — force-releasing audio focus")
-            ledger.forceRelease()
+    /** Set by onStart (binder thread); cleared on the main thread just before
+     * each enqueue, so a start that races the enqueue is never wiped. */
+    @Volatile
+    private var startSeen = false
+    private var lastEnqueueUptime = 0L
+
+    /** Backstop for callbacks that arrive late or never (engine died, binder
+     * dropped them): while focus is held, asks the engine whether it is still
+     * speaking and releases as soon as it is not. */
+    private val backstop =
+        object : Runnable {
+            override fun run() {
+                if (!ledger.isHolding) return
+                val sinceEnqueue = SystemClock.uptimeMillis() - lastEnqueueUptime
+                if (FocusLedger.shouldForceRelease(tts.isSpeaking(), startSeen, sinceEnqueue)) {
+                    Log.w(
+                        TAG,
+                        "engine idle for ${sinceEnqueue}ms without completion callbacks — force-releasing audio focus",
+                    )
+                    ledger.forceRelease()
+                } else {
+                    handler.postDelayed(this, BACKSTOP_POLL_MS)
+                }
+            }
         }
 
     /** True when the requested locale has no installed voice (surfaced in M4 UX). */
@@ -83,7 +109,9 @@ class Announcer(
         tts.addEarcon(EARCON_ALL_CLEAR, context.packageName, R.raw.all_clear)
         tts.setOnUtteranceProgressListener(
             object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) = Unit
+                override fun onStart(utteranceId: String?) {
+                    startSeen = true
+                }
 
                 override fun onDone(utteranceId: String?) = ledger.complete(utteranceId)
 
@@ -118,6 +146,7 @@ class Announcer(
         // The ledger ignores requestAudioFocus's result on purpose: safety
         // alerts must speak even when focus is denied (e.g. during a call),
         // and abandoning a never-granted request is harmless.
+        startSeen = false
         val enqueued =
             ledger.announce {
                 buildList {
@@ -132,7 +161,7 @@ class Announcer(
                     }
                 }
             }
-        if (enqueued) armWatchdog()
+        if (enqueued) armBackstop()
     }
 
     /** Descending two-tone earcon, no speech: the alerted camera is behind.
@@ -140,6 +169,7 @@ class Announcer(
      * all-clear is only true at the moment it happens. */
     fun playAllClear() {
         if (!ready) return
+        startSeen = false
         val enqueued =
             ledger.announce {
                 val utteranceId = "twsp-${utteranceSeq++}"
@@ -148,19 +178,20 @@ class Announcer(
                     else -> emptyList()
                 }
             }
-        if (enqueued) armWatchdog()
+        if (enqueued) armBackstop()
     }
 
-    /** One pending watchdog at a time, re-armed on every successful enqueue,
-     * so back-to-back alerts keep pushing the deadline out. A fire after the
-     * queue drained normally is a no-op. */
-    private fun armWatchdog() {
-        handler.removeCallbacks(watchdog)
-        handler.postDelayed(watchdog, WATCHDOG_MS)
+    /** One poll chain at a time, restarted on every successful enqueue so
+     * back-to-back alerts keep pushing the grace and the hard cap out. A tick
+     * after the queue drained normally is a no-op. */
+    private fun armBackstop() {
+        lastEnqueueUptime = SystemClock.uptimeMillis()
+        handler.removeCallbacks(backstop)
+        handler.postDelayed(backstop, BACKSTOP_POLL_MS)
     }
 
     fun release() {
-        handler.removeCallbacks(watchdog)
+        handler.removeCallbacks(backstop)
         tts.stop()
         tts.shutdown()
         ledger.forceRelease()
@@ -170,6 +201,6 @@ class Announcer(
         private const val TAG = "Announcer"
         private const val EARCON_CHIME = "[twsp_chime]"
         private const val EARCON_ALL_CLEAR = "[twsp_all_clear]"
-        private const val WATCHDOG_MS = 30_000L
+        private const val BACKSTOP_POLL_MS = 500L
     }
 }
