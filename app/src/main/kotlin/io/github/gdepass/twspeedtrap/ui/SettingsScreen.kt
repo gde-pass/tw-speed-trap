@@ -1,6 +1,8 @@
 package io.github.gdepass.twspeedtrap.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -47,21 +50,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.gdepass.twspeedtrap.R
-import io.github.gdepass.twspeedtrap.data.AppSettings
 import io.github.gdepass.twspeedtrap.data.CameraRepository
 import io.github.gdepass.twspeedtrap.data.ManualUpdateCheck
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.data.UpdateResult
 import io.github.gdepass.twspeedtrap.data.UpdateWorker
 import io.github.gdepass.twspeedtrap.detection.CameraType
+import io.github.gdepass.twspeedtrap.service.BluetoothAutoStartReceiver
 import io.github.gdepass.twspeedtrap.service.DetectionStatus
 import io.github.gdepass.twspeedtrap.util.LocaleOverride
 import io.github.gdepass.twspeedtrap.util.startActivitySafely
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -74,11 +83,13 @@ fun SettingsScreen(
     val context = LocalContext.current
     val activity = LocalActivity.current
     val repository = remember { SettingsRepository(context.applicationContext) }
-    val settings by repository.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+    // No defaults-first frame: switches would jump when the stored values arrive.
+    val loaded by repository.settings.collectAsStateWithLifecycle(initialValue = null)
     val detectionState by DetectionStatus.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        val settings = loaded ?: return@Scaffold
         Column(
             modifier =
                 Modifier
@@ -156,17 +167,22 @@ fun SettingsScreen(
             SwitchRow(stringResource(R.string.settings_auto_stop), settings.autoStopEnabled) {
                 scope.launch { repository.setAutoStopEnabled(it) }
             }
-            BluetoothAutoStartSetting(settings.autoStartBluetoothEnabled) { enabled ->
-                scope.launch { repository.setAutoStartBluetoothEnabled(enabled) }
-            }
+            BluetoothAutoStartSetting(
+                enabled = settings.autoStartBluetoothEnabled,
+                autoStopEnabled = settings.autoStopEnabled,
+                selectedDevices = settings.autoStartBluetoothDevices,
+                onSetEnabled = { enabled ->
+                    scope.launch {
+                        repository.setAutoStartBluetoothEnabled(enabled)
+                        BluetoothAutoStartReceiver.setComponentEnabled(context.applicationContext, enabled)
+                    }
+                },
+                onSetDevices = { scope.launch { repository.setAutoStartBluetoothDevices(it) } },
+            )
 
-            SectionTitle(stringResource(R.string.settings_camera_types))
-            CameraType.entries.forEach { type ->
-                SwitchRow(cameraTypeLabel(type), type in settings.enabledTypes) { enabled ->
-                    val updated = if (enabled) settings.enabledTypes + type else settings.enabledTypes - type
-                    scope.launch { repository.setEnabledTypes(updated) }
-                }
-            }
+            CameraTypesSection(
+                settings.enabledTypes,
+            ) { updated -> scope.launch { repository.setEnabledTypes(updated) } }
 
             SectionTitle(stringResource(R.string.settings_data))
             var metaRefresh by remember { mutableIntStateOf(0) }
@@ -189,13 +205,17 @@ fun SettingsScreen(
             SwitchRow(stringResource(R.string.settings_auto_update), settings.autoUpdateEnabled) {
                 scope.launch {
                     repository.setAutoUpdateEnabled(it)
-                    UpdateWorker.schedule(context.applicationContext, it, settings.wifiOnlyUpdates)
+                    // Reschedule from the stored settings, not the compose
+                    // snapshot, so the other flag is never stale.
+                    val fresh = repository.settings.first()
+                    UpdateWorker.schedule(context.applicationContext, fresh.autoUpdateEnabled, fresh.wifiOnlyUpdates)
                 }
             }
             SwitchRow(stringResource(R.string.settings_wifi_only), settings.wifiOnlyUpdates) {
                 scope.launch {
                     repository.setWifiOnlyUpdates(it)
-                    UpdateWorker.schedule(context.applicationContext, settings.autoUpdateEnabled, it)
+                    val fresh = repository.settings.first()
+                    UpdateWorker.schedule(context.applicationContext, fresh.autoUpdateEnabled, fresh.wifiOnlyUpdates)
                 }
             }
             // Process-scoped: rotating or leaving the screen must not discard
@@ -249,6 +269,31 @@ fun SettingsScreen(
     }
 }
 
+/** One switch per type; the last enabled type cannot be switched off —
+ * every type off would be detection that runs and never speaks. */
+@Composable
+private fun CameraTypesSection(
+    enabledTypes: Set<CameraType>,
+    onChange: (Set<CameraType>) -> Unit,
+) {
+    SectionTitle(stringResource(R.string.settings_camera_types))
+    CameraType.entries.forEach { type ->
+        val (label, emoji) = cameraTypeLabel(type)
+        val last = enabledTypes == setOf(type)
+        SwitchRow(label, type in enabledTypes, emoji = emoji, enabled = !last) { enabled ->
+            val updated = if (enabled) enabledTypes + type else enabledTypes - type
+            if (updated.isNotEmpty()) onChange(updated)
+        }
+    }
+    if (enabledTypes.size == 1) {
+        Text(
+            stringResource(R.string.settings_types_last),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 @Composable
 private fun SectionTitle(text: String) {
     Spacer(Modifier.height(20.dp))
@@ -271,7 +316,7 @@ private fun LanguageOption(
                 .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = currentTag == tag, onClick = { onSelect(tag) })
+        RadioButton(selected = currentTag == tag, onClick = null)
         Spacer(Modifier.width(8.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
@@ -283,7 +328,10 @@ private fun LanguageOption(
 @Composable
 private fun BluetoothAutoStartSetting(
     enabled: Boolean,
+    autoStopEnabled: Boolean,
+    selectedDevices: Set<String>,
     onSetEnabled: (Boolean) -> Unit,
+    onSetDevices: (Set<String>) -> Unit,
 ) {
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
@@ -313,6 +361,59 @@ private fun BluetoothAutoStartSetting(
             Text(stringResource(R.string.settings_bt_permission_grant))
         }
     }
+    if (!enabled) return
+    val notificationsBlocked =
+        remember(refresh) { !NotificationManagerCompat.from(context).areNotificationsEnabled() }
+    if (notificationsBlocked) {
+        Text(
+            stringResource(R.string.settings_bt_notifications_missing),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    if (!autoStopEnabled) {
+        Text(
+            stringResource(R.string.settings_bt_autostop_hint),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    // Which devices may start detection: the paired list, every one by
+    // default, so earbuds connecting at home do not start a GPS service.
+    val paired = remember(refresh) { pairedDevices(context) }
+    if (paired.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        Text(stringResource(R.string.settings_bt_devices_title), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            stringResource(
+                if (selectedDevices.isEmpty()) R.string.settings_bt_devices_any else R.string.settings_bt_devices_some,
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        paired.forEach { (address, name) ->
+            SwitchRow(name, address in selectedDevices) { on ->
+                onSetDevices(if (on) selectedDevices + address else selectedDevices - address)
+            }
+        }
+    }
+}
+
+/** Paired devices as address → name; empty without the permission or an adapter. */
+@SuppressLint("MissingPermission") // guarded: an empty list without BLUETOOTH_CONNECT
+private fun pairedDevices(context: Context): List<Pair<String, String>> {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+    ) {
+        return emptyList()
+    }
+    val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return emptyList()
+    return runCatching {
+        adapter.bondedDevices
+            .orEmpty()
+            .map { it.address to (it.name ?: it.address) }
+            .sortedBy { it.second }
+    }.getOrDefault(emptyList())
 }
 
 /** Toggle plus its display-over-other-apps permission handling: the special
@@ -350,21 +451,31 @@ private fun OverlayBubbleSetting(
     }
 }
 
+/** The whole row toggles (gloves, TalkBack: one focus stop that reads the
+ * label, not the emoji, and announces "switch"). */
 @Composable
 private fun SwitchRow(
     label: String,
     checked: Boolean,
+    emoji: String? = null,
+    enabled: Boolean = true,
     onChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+                .semantics { contentDescription = label }
                 .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Text(
+            if (emoji != null) "$label $emoji" else label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f).clearAndSetSemantics { },
+        )
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
@@ -381,20 +492,22 @@ private fun SliderRow(
 ) {
     var local by remember(value) { mutableFloatStateOf(value) }
     Column(modifier = Modifier.padding(vertical = 6.dp)) {
-        Text(label(local.roundToInt()), style = MaterialTheme.typography.bodyLarge)
+        val text = label(local.roundToInt())
+        Text(text, style = MaterialTheme.typography.bodyLarge)
         Slider(
             value = local,
             onValueChange = { local = it },
             onValueChangeFinished = { onChange(local) },
             valueRange = range,
             steps = steps,
+            modifier = Modifier.semantics { contentDescription = text },
         )
     }
 }
 
 /** Label plus the emoji the floating bubble uses for the type — a legend. */
 @Composable
-private fun cameraTypeLabel(type: CameraType): String {
+private fun cameraTypeLabel(type: CameraType): Pair<String, String> {
     val label =
         stringResource(
             when (type) {
@@ -414,7 +527,7 @@ private fun cameraTypeLabel(type: CameraType): String {
             CameraType.TECH -> "👀"
             else -> "📸"
         }
-    return "$label $emoji"
+    return label to emoji
 }
 
 private fun overlayPermissionIntent(context: Context): Intent =

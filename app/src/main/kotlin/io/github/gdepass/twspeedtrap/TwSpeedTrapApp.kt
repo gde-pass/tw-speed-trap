@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
 import io.github.gdepass.twspeedtrap.data.UpdateWorker
+import io.github.gdepass.twspeedtrap.service.BluetoothAutoStartReceiver
 import io.github.gdepass.twspeedtrap.service.BubbleOverlayController
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,7 @@ class TwSpeedTrapApp : Application() {
         appScope.launch {
             val settings = SettingsRepository(this@TwSpeedTrapApp).settings.first()
             UpdateWorker.schedule(this@TwSpeedTrapApp, settings.autoUpdateEnabled, settings.wifiOnlyUpdates)
+            BluetoothAutoStartReceiver.setComponentEnabled(this@TwSpeedTrapApp, settings.autoStartBluetoothEnabled)
         }
     }
 }

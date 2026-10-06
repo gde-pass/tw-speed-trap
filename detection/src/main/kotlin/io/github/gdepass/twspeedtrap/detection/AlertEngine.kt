@@ -39,6 +39,16 @@ class AlertEngine(
     private val config: EngineConfig = EngineConfig(),
     sections: Map<String, Section> = emptyMap(),
 ) {
+    init {
+        // A disarmed camera re-arms only when a fix sees it beyond its
+        // re-arm ring; if that ring exceeds what the index returns, a camera
+        // left while disarmed is never seen again and never fires again.
+        val rearmRingM = maxOf(config.alertDistanceM, config.highSpeedAlertDistanceM) * config.rearmFactor
+        require(rearmRingM <= GridIndex.MIN_COVERAGE_M) {
+            "re-arm ring ${rearmRingM.toInt()} m exceeds the index coverage of ${GridIndex.MIN_COVERAGE_M.toInt()} m"
+        }
+    }
+
     private val index = GridIndex(cameras)
 
     /** Fired cameras that must not re-fire, with the ring distance that fired:
@@ -68,6 +78,9 @@ class AlertEngine(
 
     /** Live section traversal: (section, projected exit average km/h); null outside. */
     val activeSection: Pair<Section, Int>? get() = sectionTracker.liveStatus
+
+    /** Section endpoints the tracker had to leave out; see [AverageSpeedTracker.unusableEndpoints]. */
+    val unusableSectionEndpoints: Int get() = sectionTracker.unusableEndpoints
 
     fun onFix(fix: Fix): List<AlertEvent> {
         updateBearingMemory(fix)
@@ -231,15 +244,29 @@ class AlertEngine(
         return angularDifference(travel, toCamera) > AHEAD_HALF_PLANE_DEG
     }
 
-    /** Fails open only when no direction is known at all: a bearingless
-     * camera, or a rider with no bearing seen at speed within the memory. */
+    /**
+     * Fails open only when no direction is known at all: a bearingless
+     * camera, or a rider with no bearing seen at speed within the memory.
+     * On a bend inside the ring the heading can be 45–90° off the enforced
+     * direction while the rider is plainly upstream on the camera's own
+     * axis; that still counts, so the alert is not postponed to the last
+     * 100 m. Oncoming traffic (heading opposite) never matches either way.
+     */
     private fun bearingMatches(
         fix: Fix,
         camera: Camera,
     ): Boolean {
         val enforced = camera.bearingDeg ?: return true
         val travel = effectiveBearing(fix) ?: return true
-        return angularDifference(travel, enforced) <= config.bearingToleranceDeg
+        val headingOff = angularDifference(travel, enforced)
+        return when {
+            headingOff <= config.bearingToleranceDeg -> true
+            headingOff > AHEAD_HALF_PLANE_DEG -> false
+            else -> {
+                val toCamera = GeoMath.bearingDegrees(fix.lat, fix.lon, camera.lat, camera.lon)
+                angularDifference(toCamera, enforced) <= config.bearingToleranceDeg
+            }
+        }
     }
 
     private fun updateBearingMemory(fix: Fix) {

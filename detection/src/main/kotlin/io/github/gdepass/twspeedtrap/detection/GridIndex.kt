@@ -36,5 +36,9 @@ class GridIndex(
 
     companion object {
         const val CELL_DEG = 0.01
+
+        /** Guaranteed query coverage: one full cell in the worst direction.
+         * 0.01° of longitude at Taiwan's northern tip (25.3°) is 1006 m. */
+        const val MIN_COVERAGE_M = 1_000.0
     }
 }

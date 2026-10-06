@@ -3,9 +3,11 @@ package io.github.gdepass.twspeedtrap.service
 import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.github.gdepass.twspeedtrap.data.SettingsRepository
@@ -44,6 +46,7 @@ class BluetoothAutoStartReceiver : BroadcastReceiver() {
             Log.w(TAG, "location permission missing — ignoring Bluetooth connect")
             return
         }
+        val device = connectedDevice(intent)
         val pending = goAsync()
         // The timeout keeps the coroutine bounded well inside the ~10 s
         // broadcast window, so nothing outlives the receiver.
@@ -56,11 +59,28 @@ class BluetoothAutoStartReceiver : BroadcastReceiver() {
                     withTimeoutOrNull(SETTINGS_TIMEOUT_MS) {
                         SettingsRepository(context.applicationContext).settings.first()
                     }
-                if (settings?.autoStartBluetoothEnabled == true) startOrPrompt(context.applicationContext)
+                when {
+                    settings?.autoStartBluetoothEnabled != true -> Unit
+                    !deviceAllowed(device, settings.autoStartBluetoothDevices) ->
+                        Log.i(TAG, "device $device is not in the auto-start list — ignoring")
+                    else -> startOrPrompt(context.applicationContext)
+                }
             } finally {
                 pending.finish()
             }
         }
+    }
+
+    /** The connected device's address, or null when the broadcast carries none. */
+    private fun connectedDevice(intent: Intent): String? {
+        val device =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+            }
+        return device?.address
     }
 
     private fun startOrPrompt(context: Context) {
@@ -88,6 +108,34 @@ class BluetoothAutoStartReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "BluetoothAutoStart"
-        private const val SETTINGS_TIMEOUT_MS = 8_000L
+
+        /** Well inside the ~10 s temporary allowlist the broadcast grants for the service start. */
+        private const val SETTINGS_TIMEOUT_MS = 5_000L
+
+        /** Empty list = every device (the original behaviour); otherwise only the chosen ones. */
+        fun deviceAllowed(
+            address: String?,
+            allowed: Set<String>,
+        ): Boolean = allowed.isEmpty() || (address != null && address.uppercase() in allowed.map { it.uppercase() })
+
+        /**
+         * The manifest receiver is otherwise always live: every watch or
+         * earbud reconnect cold-started the process (Application.onCreate,
+         * DataStore, WorkManager) only to read a disabled setting.
+         */
+        fun setComponentEnabled(
+            context: Context,
+            enabled: Boolean,
+        ) {
+            context.packageManager.setComponentEnabledSetting(
+                ComponentName(context, BluetoothAutoStartReceiver::class.java),
+                if (enabled) {
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                } else {
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                },
+                PackageManager.DONT_KILL_APP,
+            )
+        }
     }
 }

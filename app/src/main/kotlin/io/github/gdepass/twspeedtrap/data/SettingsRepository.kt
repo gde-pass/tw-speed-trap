@@ -40,6 +40,8 @@ data class AppSettings(
     val autoStopEnabled: Boolean = false,
     /** Start detection when a Bluetooth device connects (helmet intercom). */
     val autoStartBluetoothEnabled: Boolean = false,
+    /** MAC addresses of the devices that may auto-start; empty = any device. */
+    val autoStartBluetoothDevices: Set<String> = emptySet(),
     /** Chime once the alerted camera is behind and nothing else is ahead. */
     val allClearChimeEnabled: Boolean = false,
     /** Floating bubble over other apps: green = clear, red = camera countdown. */
@@ -91,6 +93,7 @@ class SettingsRepository(
                     wifiOnlyUpdates = prefs[KEY_WIFI_ONLY] ?: DEFAULTS.wifiOnlyUpdates,
                     autoStopEnabled = prefs[KEY_AUTO_STOP] ?: DEFAULTS.autoStopEnabled,
                     autoStartBluetoothEnabled = prefs[KEY_AUTO_START_BT] ?: DEFAULTS.autoStartBluetoothEnabled,
+                    autoStartBluetoothDevices = prefs[KEY_AUTO_START_BT_DEVICES] ?: DEFAULTS.autoStartBluetoothDevices,
                     allClearChimeEnabled = prefs[KEY_ALL_CLEAR_CHIME] ?: DEFAULTS.allClearChimeEnabled,
                     overlayBubbleEnabled = prefs[KEY_OVERLAY_BUBBLE] ?: DEFAULTS.overlayBubbleEnabled,
                     overlayX = prefs[KEY_OVERLAY_X] ?: DEFAULTS.overlayX,
@@ -122,6 +125,9 @@ class SettingsRepository(
     suspend fun setAutoStopEnabled(value: Boolean) = context.dataStore.edit { it[KEY_AUTO_STOP] = value }
 
     suspend fun setAutoStartBluetoothEnabled(value: Boolean) = context.dataStore.edit { it[KEY_AUTO_START_BT] = value }
+
+    suspend fun setAutoStartBluetoothDevices(addresses: Set<String>) =
+        context.dataStore.edit { it[KEY_AUTO_START_BT_DEVICES] = addresses }
 
     suspend fun setAllClearChimeEnabled(value: Boolean) = context.dataStore.edit { it[KEY_ALL_CLEAR_CHIME] = value }
 
@@ -156,6 +162,9 @@ class SettingsRepository(
             return tag
         }
 
+        /** The mirrored language tag, or null when none is cached yet; never blocks. */
+        fun peekLanguageTag(context: Context): String? = languageCache(context).getString(KEY_LANGUAGE.name, null)
+
         private fun languageCache(context: Context) =
             context.applicationContext.getSharedPreferences("settings_cache", Context.MODE_PRIVATE)
 
@@ -169,6 +178,7 @@ class SettingsRepository(
         private val KEY_WIFI_ONLY = booleanPreferencesKey("wifi_only_updates")
         private val KEY_AUTO_STOP = booleanPreferencesKey("auto_stop_stationary")
         private val KEY_AUTO_START_BT = booleanPreferencesKey("auto_start_bluetooth")
+        private val KEY_AUTO_START_BT_DEVICES = stringSetPreferencesKey("auto_start_bluetooth_devices")
         private val KEY_ALL_CLEAR_CHIME = booleanPreferencesKey("all_clear_chime")
         private val KEY_OVERLAY_BUBBLE = booleanPreferencesKey("overlay_bubble")
         private val KEY_OVERLAY_X = intPreferencesKey("overlay_x")

@@ -24,6 +24,15 @@ object LocaleOverride {
         return context.createConfigurationContext(configuration)
     }
 
+    /** Wraps with the cached app language — for notifications posted from
+     * contexts (receiver, bubble) that have no settings read at hand. */
+    fun wrapCached(context: Context): Context =
+        wrap(
+            context,
+            io.github.gdepass.twspeedtrap.data.SettingsRepository
+                .peekLanguageTag(context) ?: SYSTEM,
+        )
+
     /**
      * The locale the TTS voice must speak. With "system" this is not simply
      * the device locale: strings only ship in [SUPPORTED_LANGUAGES], so on a

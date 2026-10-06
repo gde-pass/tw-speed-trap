@@ -50,6 +50,10 @@
 - Update path: signature → schema == SUPPORTED → version format → trusted URL (normalised) → newer? → download → sha256 → `CameraRepository.probe` (the real queries) + meta match → fsync + rename, all under one process-wide Mutex; bad published data is `permanent = true` (no re-download retries), only network errors retry
 - `CameraRepository.ensureDatabase` replaces the local db with the bundled one once per app version when the bundled `data_version` is newer (auto-update off must not mean install-day data forever)
 - The About screen's dataset list is `about_attribution_datasets` (non-translatable, single-sourced); `pipeline/tests/test_attribution.py` fails when it drifts from `cli.DATASETS`
+- Section gantry crossings are along-track: ridden distance = length + exit-fix offset − entry-fix offset along each gantry's axis (chord bearing when the gantry has none); crawl-entry backdating is capped at 30 s; a traversal is abandoned outside the entry/exit ellipse (d_entry + d_exit > length + 1 km)
+- `AlertEngine` refuses a config whose re-arm ring exceeds `GridIndex.MIN_COVERAGE_M` (1 km) — keep the settings sliders ≤ 600 m with rearmFactor 1.5
+- `BluetoothAutoStartReceiver` is a toggled component (`setComponentEnabled`, synced in Application.onCreate and from the setting) and honours the `autoStartBluetoothDevices` allow-list (empty = any device); `TapToStart.post` returns false when notifications are blocked
+- `Fix.timestampMs` from `LocationSource` is the boot clock (`elapsedRealtimeNanos`), never wall time, and every fix of a batched result is delivered
 - Audio focus is refcounted in FocusLedger: track an utterance id only if the TTS enqueue returned SUCCESS, and every request must have a guaranteed abandon (completion callbacks + a 500 ms `tts.isSpeaking()` poll backstop with a 30 s hard cap) — never a single last-utterance-id gate, never a fixed long timeout as the only fallback (music stayed ducked 30 s whenever onDone was lost)
 
 ## Tooling quirks

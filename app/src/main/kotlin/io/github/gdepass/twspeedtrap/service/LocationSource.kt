@@ -40,17 +40,23 @@ class LocationSource(
                     }
 
                     override fun onLocationResult(result: LocationResult) {
-                        val location = result.lastLocation ?: return
-                        trySend(
-                            Fix(
-                                lat = location.latitude,
-                                lon = location.longitude,
-                                speedMps = if (location.hasSpeed()) location.speed.toDouble() else 0.0,
-                                bearingDeg = if (location.hasBearing()) location.bearing.toDouble() else null,
-                                accuracyM = if (location.hasAccuracy()) location.accuracy.toDouble() else 99.0,
-                                timestampMs = location.time,
-                            ),
-                        )
+                        // Every fix of a batched result, oldest first: dropping
+                        // all but the last would hide the fixes that crossed a
+                        // gantry. Timestamps are monotonic (boot clock) so an
+                        // NTP step can neither rewind the engine nor inflate
+                        // a section's elapsed time.
+                        for (location in result.locations) {
+                            trySend(
+                                Fix(
+                                    lat = location.latitude,
+                                    lon = location.longitude,
+                                    speedMps = if (location.hasSpeed()) location.speed.toDouble() else 0.0,
+                                    bearingDeg = if (location.hasBearing()) location.bearing.toDouble() else null,
+                                    accuracyM = if (location.hasAccuracy()) location.accuracy.toDouble() else 99.0,
+                                    timestampMs = location.elapsedRealtimeNanos / 1_000_000L,
+                                ),
+                            )
+                        }
                     }
                 }
             client

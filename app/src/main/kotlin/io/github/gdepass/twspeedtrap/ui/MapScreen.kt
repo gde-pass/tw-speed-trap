@@ -20,8 +20,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,6 +51,9 @@ import org.osmdroid.views.overlay.simplefastpoint.SimpleFastPointOverlay
 import org.osmdroid.views.overlay.simplefastpoint.SimpleFastPointOverlayOptions
 import org.osmdroid.views.overlay.simplefastpoint.SimplePointTheme
 import java.io.File
+
+private const val TILE_CACHE_MAX_BYTES = 100L * 1024 * 1024
+private const val TILE_CACHE_TRIM_BYTES = 80L * 1024 * 1024
 
 // One color per camera type, mirrored between the map dots and the legend.
 private val TYPE_COLORS =
@@ -85,19 +91,26 @@ fun MapScreen(onBack: () -> Unit) {
                 buildCameraOverlays(cameras)
             }
     }
+    // Survives rotation: the view is rebuilt, the camera position is not lost.
+    var savedLat by rememberSaveable { mutableDoubleStateOf(23.75) }
+    var savedLon by rememberSaveable { mutableDoubleStateOf(120.95) }
+    var savedZoom by rememberSaveable { mutableDoubleStateOf(8.0) }
     val mapView =
         remember {
-            // OSM tile policy: identify ourselves and cache tiles on disk.
+            // OSM tile policy: identify ourselves and cache tiles on disk,
+            // bounded — the library default would grow to ~600 MB.
             Configuration.getInstance().apply {
                 userAgentValue = context.packageName
                 osmdroidBasePath = File(context.cacheDir, "osmdroid")
                 osmdroidTileCache = File(context.cacheDir, "osmdroid/tiles")
+                tileFileSystemCacheMaxBytes = TILE_CACHE_MAX_BYTES
+                tileFileSystemCacheTrimBytes = TILE_CACHE_TRIM_BYTES
             }
             MapView(context).apply {
                 setTileSource(TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
-                controller.setZoom(8.0)
-                controller.setCenter(GeoPoint(23.75, 120.95))
+                controller.setZoom(savedZoom)
+                controller.setCenter(GeoPoint(savedLat, savedLon))
                 overlays.add(CopyrightOverlay(context))
             }
         }
@@ -117,6 +130,9 @@ fun MapScreen(onBack: () -> Unit) {
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
+            savedLat = mapView.mapCenter.latitude
+            savedLon = mapView.mapCenter.longitude
+            savedZoom = mapView.zoomLevelDouble
             mapView.onPause()
             mapView.onDetach()
         }

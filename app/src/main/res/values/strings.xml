@@ -122,4 +122,11 @@
     <string name="banner_alert">%1$s in %2$d m</string>
     <string name="banner_alert_limit">%1$s in %2$d m — limit %3$d</string>
     <string name="banner_section">Average zone, limit %1$d — heading for %2$d km/h</string>
+    <string name="btn_starting">Starting…</string>
+    <string name="settings_types_last">At least one camera type stays on.</string>
+    <string name="settings_bt_notifications_missing">Notifications are blocked — the “tap to start” notification cannot appear.</string>
+    <string name="settings_bt_autostop_hint">Tip: turn on “Stop detection after 10 min stationary” so a connection at home does not run GPS for hours.</string>
+    <string name="settings_bt_devices_title">Start only for these devices</string>
+    <string name="settings_bt_devices_any">None selected: any Bluetooth device starts detection.</string>
+    <string name="settings_bt_devices_some">Only the selected devices start detection.</string>
 </resources>

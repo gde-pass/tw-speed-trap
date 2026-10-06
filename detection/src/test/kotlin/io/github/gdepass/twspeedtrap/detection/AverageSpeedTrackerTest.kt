@@ -474,4 +474,104 @@ class AverageSpeedTrackerTest {
         val warning = events.filterIsInstance<AlertEvent.SectionOverPace>().single()
         assertTrue(warning.projectedAvgKmh in 78..82, "expected ~80 km/h projected, got ${warning.projectedAvgKmh}")
     }
+
+    // ---- tunnel exit slop, backdating cap, corridor -----------------------
+
+    @Test
+    fun `exit fix past the gantry after a gap reports the true average`() {
+        // 487 m tunnel section (辛亥), limit 50; GPS lost from 30 m after
+        // entry until ~46 m past the exit gantry (inside the 60 m ball).
+        val shortLength = 487.0
+        val shortExitLat = entryLat + shortLength * degPerMeter
+        val tracker =
+            AverageSpeedTracker(
+                listOf(
+                    sectionCamera("sec-tunnel-entry", entryLat, 0.0, "tunnel", "start"),
+                    sectionCamera("sec-tunnel-exit", shortExitLat, 0.0, "tunnel", "end"),
+                ),
+                mapOf("tunnel" to Section("tunnel", 50, shortLength)),
+            )
+        val speedMps = 70.0 / 3.6
+        val fixes = mutableListOf<Fix>()
+        var position = -100.0
+        var timeMs = 0L
+        while (position < shortLength + 300.0) {
+            if (position <= 30.0 || position >= shortLength + 40.0) fixes.add(northboundFix(position, speedMps, timeMs))
+            position += speedMps
+            timeMs += 1000L
+        }
+        val events = fixes.flatMap(tracker::onFix)
+        val exit = events.filterIsInstance<AlertEvent.SectionExited>().single()
+        assertFalse(exit.estimated, "a fix inside the exit ball is a real exit")
+        assertTrue(exit.averageKmh in 67..73, "true 70 km/h, got ${exit.averageKmh}")
+        assertTrue(exit.overLimit, "70 km/h on a 50 limit (+10) must flag")
+    }
+
+    @Test
+    fun `a ten-minute stop at a portal does not backdate the entry by ten minutes`() {
+        val active = mirroredTracker()
+        val events = mutableListOf<AlertEvent>()
+        // Parked on the northern portal for 10 minutes, no bearing.
+        repeat(600) { events += active.onFix(northboundFix(lengthM, 0.0, it * 1000L, bearing = null)) }
+        assertTrue(events.isEmpty())
+        // Rides off southbound at 60 km/h: 2000 m in 120 s.
+        var position = lengthM
+        var timeMs = 600_000L
+        val speedMps = 60.0 / 3.6
+        while (position > -100.0) {
+            events += active.onFix(northboundFix(position, speedMps, timeMs, bearing = 180.0))
+            position -= speedMps
+            timeMs += 1000L
+        }
+        val exit = events.filterIsInstance<AlertEvent.SectionExited>().single()
+        assertTrue(
+            exit.averageKmh in 45..60,
+            "entry backdated by at most 30 s: expected 45–60 km/h, got ${exit.averageKmh}",
+        )
+    }
+
+    @Test
+    fun `turning off right after the entry portal abandons the section`() {
+        val tracker = mirroredTracker()
+        val speedMps = 50.0 / 3.6
+        var timeMs = 0L
+        // Northbound through the entry portal.
+        var position = -200.0
+        var entered = false
+        while (position < 40.0) {
+            if (tracker.onFix(northboundFix(position, speedMps, timeMs)).any { it is AlertEvent.SectionEntered }) {
+                entered =
+                    true
+            }
+            position += speedMps
+            timeMs += 1000L
+        }
+        assertTrue(entered)
+        // Then straight east on a side road, away from the section.
+        var eastM = 0.0
+        while (eastM < 2500.0) {
+            val fix =
+                Fix(
+                    lat = entryLat + 40.0 * degPerMeter,
+                    lon = lon + eastM / 101_560.0,
+                    speedMps = speedMps,
+                    bearingDeg = 90.0,
+                    accuracyM = 5.0,
+                    timestampMs = timeMs,
+                )
+            tracker.onFix(fix)
+            eastM += speedMps
+            timeMs += 1000L
+        }
+        assertFalse(tracker.isActive, "2.5 km east of a 2 km section is outside its corridor")
+    }
+
+    @Test
+    fun `endpoints that cannot take part are counted`() {
+        val orphanEntry = sectionCamera("sec-orphan-entry", entryLat, 0.0, "orphan", "start")
+        val duplicateExit = sectionCamera("sec-test-exit-2", exitLat, 0.0, "test", "end")
+        val tracker = AverageSpeedTracker(endpoints + orphanEntry + duplicateExit, mapOf("test" to section))
+        assertEquals(2, tracker.unusableEndpoints)
+        assertEquals(0, tracker().unusableEndpoints)
+    }
 }

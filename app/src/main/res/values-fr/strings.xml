@@ -118,4 +118,11 @@
     <string name="banner_alert">%1$s à %2$d m</string>
     <string name="banner_alert_limit">%1$s à %2$d m — limite %3$d</string>
     <string name="banner_section">Zone de vitesse moyenne, limite %1$d — en route vers %2$d km/h</string>
+    <string name="btn_starting">Démarrage…</string>
+    <string name="settings_types_last">Au moins un type de radar reste activé.</string>
+    <string name="settings_bt_notifications_missing">Notifications bloquées — la notification « Touchez pour démarrer » ne peut pas apparaître.</string>
+    <string name="settings_bt_autostop_hint">Astuce : activez « Arrêter après 10 min à l’arrêt » pour qu’une connexion à la maison ne fasse pas tourner le GPS pendant des heures.</string>
+    <string name="settings_bt_devices_title">Démarrer seulement pour ces appareils</string>
+    <string name="settings_bt_devices_any">Aucune sélection : tout appareil Bluetooth démarre la détection.</string>
+    <string name="settings_bt_devices_some">Seuls les appareils sélectionnés démarrent la détection.</string>
 </resources>

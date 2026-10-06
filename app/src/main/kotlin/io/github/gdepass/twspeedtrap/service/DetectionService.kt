@@ -1,5 +1,6 @@
 package io.github.gdepass.twspeedtrap.service
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.SystemClock
@@ -73,8 +75,15 @@ class DetectionService : LifecycleService() {
         // Every start request must reach startForeground, including redundant
         // ones while already running (Bluetooth auto-start, notification tap).
         if (!startForegroundOrDegrade()) return
+        // A start that succeeded supersedes any "tap to start" or failure
+        // notification still on the shade.
+        getSystemService(NotificationManager::class.java).apply {
+            cancel(TapToStart.NOTIFICATION_ID)
+            cancel(FAILURE_NOTIFICATION_ID)
+        }
         if (detectionJob != null) return
 
+        DetectionStatus.update { it.copy(starting = true) }
         detectionJob =
             lifecycleScope.launch {
                 @Suppress("TooGenericExceptionCaught") // whatever breaks, the rider must hear about it
@@ -113,7 +122,13 @@ class DetectionService : LifecycleService() {
 
     private fun degradeToTapToStart(e: Exception) {
         Log.e(TAG, "startForeground rejected, degrading to tap-to-start", e)
-        TapToStart.post(this)
+        val fineGranted =
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        // Without location permission a tap would only reproduce the same
+        // rejection and post the same notification again: a loop. The rider
+        // has to open the app and grant it.
+        if (fineGranted) TapToStart.post(this) else Log.w(TAG, "location permission missing — not posting tap-to-start")
         stopSelf()
     }
 
@@ -134,7 +149,10 @@ class DetectionService : LifecycleService() {
         val repository = CameraRepository(this@DetectionService)
         val (cameras, sections) = withContext(Dispatchers.IO) { repository.loadAll() }
         val engine = AlertEngine(cameras, settings.toEngineConfig(), sections)
-        DetectionStatus.update { it.copy(running = true, cameraCount = cameras.size) }
+        if (engine.unusableSectionEndpoints > 0) {
+            Log.w(TAG, "${engine.unusableSectionEndpoints} section endpoint(s) unusable — check the pipeline output")
+        }
+        DetectionStatus.update { it.copy(starting = false, running = true, cameraCount = cameras.size) }
         val stationary = StationaryDetector()
         val throttle = NotificationThrottle()
         val staleWatch = launchStaleFixWatch()
@@ -222,8 +240,9 @@ class DetectionService : LifecycleService() {
             NotificationCompat
                 .Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(getString(R.string.notif_title))
+                .setContentTitle(localized.getString(R.string.notif_title))
                 .setContentText(text)
+                .setContentIntent(openAppIntent)
                 .setAutoCancel(true)
                 .build(),
         )
@@ -352,12 +371,12 @@ class DetectionService : LifecycleService() {
     // The intents are constant, so the PendingIntents can be created once per
     // service instance instead of twice per notification post.
     private val openAppIntent: PendingIntent by lazy {
-        PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE,
-        )
+        // The launcher intent matches the task's root, so tapping brings the
+        // existing activity forward instead of stacking a second MainActivity.
+        val launch =
+            packageManager.getLaunchIntentForPackage(packageName)
+                ?: Intent(this, MainActivity::class.java)
+        PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE)
     }
     private val stopIntent: PendingIntent by lazy {
         PendingIntent.getService(
@@ -372,12 +391,12 @@ class DetectionService : LifecycleService() {
         NotificationCompat
             .Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.notif_title))
+            .setContentTitle(localized.getString(R.string.notif_title))
             .setContentText(text)
             .setContentIntent(openAppIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(0, getString(R.string.notif_stop), stopIntent)
+            .addAction(0, localized.getString(R.string.notif_stop), stopIntent)
             .build()
 
     private fun updateNotification(

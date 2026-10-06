@@ -1,6 +1,7 @@
 package io.github.gdepass.twspeedtrap.detection
 
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -40,6 +41,8 @@ class AverageSpeedTracker(
         val entry: Camera,
         val exit: Camera,
         val entryTimeMs: Long,
+        /** Signed along-track offset of the entry fix from its gantry (negative = short of it). */
+        val entryAlongM: Double,
         var warned: Boolean = false,
     ) {
         /** Straight-line entry→exit distance; the road is [Section.lengthM] long. */
@@ -67,18 +70,27 @@ class AverageSpeedTracker(
         val bestByCandidate: MutableMap<String, Pair<Double, Long>>,
     )
 
-    private val exitsBySection =
-        endpoints
-            .filter { it.type == CameraType.SECTION && it.sectionRole == "end" }
-            .associateBy { it.sectionId }
+    private val sectionEndpoints = endpoints.filter { it.type == CameraType.SECTION }
+    private val exitsBySection: Map<String?, Camera> =
+        sectionEndpoints
+            .filter { it.sectionRole == "end" }
+            .groupBy { it.sectionId }
+            .mapValues { (_, exits) -> exits.minBy { it.id } }
     private val entries =
-        endpoints.filter {
-            it.type == CameraType.SECTION &&
-                it.sectionRole == "start" &&
+        sectionEndpoints.filter {
+            it.sectionRole == "start" &&
                 it.sectionId != null &&
                 it.sectionId in sections &&
                 it.sectionId in exitsBySection
         }
+
+    /** Section endpoints that cannot take part — an entry whose section or
+     * exit is missing, a second exit for one section — counted, never silent,
+     * so a pipeline regression shows up in the service log instead of as a
+     * section that quietly stopped announcing. */
+    val unusableEndpoints: Int =
+        sectionEndpoints.count { it.sectionRole == "start" && it !in entries } +
+            sectionEndpoints.count { it.sectionRole == "end" } - exitsBySection.size
     private var active: Traversal? = null
     private var pending: PendingEntry? = null
     private var lastReliableBearingDeg: Double? = null
@@ -157,7 +169,13 @@ class AverageSpeedTracker(
         val section = traversal.section
         val remainingM = GeoMath.distanceMeters(fix.lat, fix.lon, traversal.exit.lat, traversal.exit.lon)
         if (remainingM <= ENDPOINT_RADIUS_M) {
-            return exitEvents(traversal, elapsedS, section.lengthM, overshootM = 0.0, estimated = false)
+            // The entry and exit fixes each sit up to a fix step (or, after a
+            // tunnel gap, up to 60 m) off their gantry. The distance actually
+            // ridden between the two fixes is the section length plus the
+            // signed along-track offsets; without them a 487 m tunnel exited
+            // 46 m late read 55 km/h for a true 60.
+            val riddenM = section.lengthM + alongAxis(traversal.exit, traversal, fix) - traversal.entryAlongM
+            return exitEvents(traversal, elapsedS, riddenM, overshootM = 0.0, estimated = false)
         }
         // First fix past the exit after a GPS gap (tunnel reacquisition). The
         // gap gate keeps curved sections from tripping this under continuous
@@ -166,14 +184,40 @@ class AverageSpeedTracker(
             return exitEvents(traversal, elapsedS, section.lengthM + remainingM, remainingM, estimated = true)
         }
         val distFromEntryM = GeoMath.distanceMeters(fix.lat, fix.lon, traversal.entry.lat, traversal.entry.lon)
-        // Corridor bound is safe on curves: any point on the section road is at
-        // most lengthM from the entry in road distance, hence straight-line too.
+        // Corridor bound, safe on curves: every point of the section road is
+        // within lengthM of the entry *and* of the exit by road, so its
+        // straight-line distances sum to at most lengthM. Outside that
+        // ellipse the rider has left the section (turned off after the
+        // portal) — the old entry-only bound let a 8 km section linger for
+        // 9 km of unrelated riding.
         if (behindEntry(traversal, fix, distFromEntryM) ||
-            distFromEntryM > section.lengthM + CORRIDOR_MARGIN_M
+            distFromEntryM + remainingM > section.lengthM + CORRIDOR_MARGIN_M
         ) {
             return abandon()
         }
         return overPaceEvents(traversal, fix, elapsedS, remainingM)
+    }
+
+    /** Signed distance of [fix] past [gantry] along the gantry's axis
+     * (negative = still short of it); the entry→exit bearing stands in for
+     * a gantry without one. */
+    private fun alongAxis(
+        gantry: Camera,
+        traversal: Traversal,
+        fix: Fix,
+    ): Double = alongAxis(gantry, gantry.bearingDeg ?: chordBearing(traversal), fix)
+
+    private fun chordBearing(traversal: Traversal): Double =
+        GeoMath.bearingDegrees(traversal.entry.lat, traversal.entry.lon, traversal.exit.lat, traversal.exit.lon)
+
+    private fun alongAxis(
+        gantry: Camera,
+        axisDeg: Double,
+        fix: Fix,
+    ): Double {
+        val distance = GeoMath.distanceMeters(gantry.lat, gantry.lon, fix.lat, fix.lon)
+        val toFix = GeoMath.bearingDegrees(gantry.lat, gantry.lon, fix.lat, fix.lon)
+        return distance * cos(Math.toRadians(AlertEngine.angularDifference(toFix, axisDeg)))
     }
 
     private fun passedExit(
@@ -346,8 +390,25 @@ class AverageSpeedTracker(
                 compareBy({ GeoMath.distanceMeters(fix.lat, fix.lon, it.lat, it.lon) }, { it.id }),
             ) ?: return emptyList()
         val section = sections.getValue(chosen.sectionId!!)
-        val startMs = entryTimeMs ?: best[chosen.id]?.second ?: fix.timestampMs
-        active = Traversal(section, chosen, exitsBySection.getValue(chosen.sectionId), startMs)
+        // Backdating is bounded: a rider who parked at a shared portal for
+        // ten minutes and rode on crossed the gantry when they moved off,
+        // not when they arrived — unbounded, the average read 22 km/h for a
+        // true 60.
+        val startMs =
+            entryTimeMs
+                ?: best[chosen.id]?.second?.coerceAtLeast(fix.timestampMs - MAX_BACKDATE_MS)
+                ?: fix.timestampMs
+        val exit = exitsBySection.getValue(chosen.sectionId)
+        // A live entry records where the fix sat relative to the gantry; a
+        // backdated crawl entry is timed at the closest approach, i.e. at it.
+        val entryAlongM =
+            if (entryTimeMs != null) {
+                val axis = chosen.bearingDeg ?: GeoMath.bearingDegrees(chosen.lat, chosen.lon, exit.lat, exit.lon)
+                alongAxis(chosen, axis, fix)
+            } else {
+                0.0
+            }
+        active = Traversal(section, chosen, exit, startMs, entryAlongM)
         return listOf(AlertEvent.SectionEntered(section))
     }
 
@@ -404,6 +465,9 @@ class AverageSpeedTracker(
         const val PENDING_RESOLVE_MAX_M = 500.0
         const val PENDING_MIN_DISPLACEMENT_M = 30.0
         const val PENDING_MAX_AGE_MS = 600_000L
+
+        /** A crawl entry is backdated to its closest approach, but never further than this. */
+        const val MAX_BACKDATE_MS = 30_000L
 
         /** Bounding-box prefilter (~110 m) so 19 island-wide entries cost comparisons, not haversines. */
         const val ENTRY_PREFILTER_DEG = 0.001

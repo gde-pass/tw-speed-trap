@@ -114,12 +114,15 @@ object BubbleOverlayController {
         status: DetectionStatus.UiState,
         present: Boolean,
     ) {
+        // canDrawOverlays is a binder round-trip to AppOps; at 1 Hz status
+        // updates it is only worth asking when the answer could matter.
+        val wanted = settings.overlayBubbleEnabled && (present || status.running)
         val show =
             shouldShow(
                 settings.overlayBubbleEnabled,
                 present,
                 status.running,
-                Settings.canDrawOverlays(app),
+                wanted && Settings.canDrawOverlays(app),
             )
         if (!show) {
             bubble?.detach()

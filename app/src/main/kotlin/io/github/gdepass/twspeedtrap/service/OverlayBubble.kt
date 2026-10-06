@@ -123,12 +123,34 @@ class OverlayBubble(
             isFakeBoldText = true
         }
 
+    // Preallocated: onDraw runs at 1 Hz during an alert.
+    private val cardRect = RectF()
+    private val glyphRect = RectF()
+    private val playPath = Path()
+
     init {
         strokePaint.strokeWidth = hPx * 0.045f
         valuePaint.textSize = hPx * 0.26f
         unitPaint.textSize = hPx * 0.13f
         emojiPaint.textSize = hPx * 0.30f
+        // Accessibility services deliver ACTION_CLICK only to clickable views.
+        isClickable = true
+        isFocusable = true
         contentDescription = context.getString(R.string.btn_start)
+        val r = quietPx / 2f
+        playPath.apply {
+            moveTo(r - r * 0.26f, r - r * 0.45f)
+            lineTo(r - r * 0.26f, r + r * 0.45f)
+            lineTo(r + r * 0.54f, r)
+            close()
+        }
+    }
+
+    /** Rotation changes the screen bounds the position is clamped to. */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration?) {
+        super.onConfigurationChanged(newConfig)
+        clampToScreen()
+        updateLayout()
     }
 
     fun attach() {
@@ -155,11 +177,40 @@ class OverlayBubble(
     fun render(newState: BubbleState) {
         if (newState == state) return
         state = newState
-        contentDescription =
-            context.getString(if (newState is BubbleState.Idle) R.string.btn_start else R.string.btn_stop)
+        contentDescription = describe(newState)
         applyWindowSize(newState)
         invalidate()
     }
+
+    /** What TalkBack reads: the state, then what a tap does. */
+    private fun describe(s: BubbleState): String {
+        val action = context.getString(if (s is BubbleState.Idle) R.string.btn_start else R.string.btn_stop)
+        val status =
+            when (s) {
+                is BubbleState.Idle -> return action
+                is BubbleState.Clear -> context.getString(R.string.no_camera_nearby)
+                is BubbleState.NoGps -> context.getString(R.string.gps_waiting)
+                is BubbleState.Alert -> {
+                    val type = context.getString(typeLabel(s.type))
+                    if (s.limitKmh != null) {
+                        context.getString(R.string.banner_alert_limit, type, s.distanceM, s.limitKmh)
+                    } else {
+                        context.getString(R.string.banner_alert, type, s.distanceM)
+                    }
+                }
+                is BubbleState.Section -> context.getString(R.string.banner_section, s.limitKmh, s.projectedKmh)
+            }
+        return "$status. $action"
+    }
+
+    private fun typeLabel(type: CameraType): Int =
+        when (type) {
+            CameraType.RED_LIGHT -> R.string.type_red_light
+            CameraType.TECH -> R.string.type_tech
+            CameraType.MOBILE -> R.string.type_mobile
+            CameraType.SECTION -> R.string.type_section
+            else -> R.string.type_fixed
+        }
 
     /** Quiet states get a small window, loud states the full card, keeping the
      * visual centre in place. */
@@ -236,10 +287,10 @@ class OverlayBubble(
     ) {
         fillPaint.color = color
         val inset = strokePaint.strokeWidth
-        val rect = RectF(inset, inset, wPx - inset, hPx - inset)
+        cardRect.set(inset, inset, wPx - inset, hPx - inset)
         val corner = hPx * 0.26f
-        canvas.drawRoundRect(rect, corner, corner, fillPaint)
-        canvas.drawRoundRect(rect, corner, corner, strokePaint)
+        canvas.drawRoundRect(cardRect, corner, corner, fillPaint)
+        canvas.drawRoundRect(cardRect, corner, corner, strokePaint)
     }
 
     /** Type emoji always on show; the limit sign joins it when the limit is known. */
@@ -301,17 +352,9 @@ class OverlayBubble(
 
     private fun drawPlayGlyph(canvas: Canvas) {
         glyphPaint.color = Color.WHITE
-        val cx = width / 2f
-        val cy = height / 2f
-        val r = quietPx / 2f
-        val path =
-            Path().apply {
-                moveTo(cx - r * 0.26f, cy - r * 0.45f)
-                lineTo(cx - r * 0.26f, cy + r * 0.45f)
-                lineTo(cx + r * 0.54f, cy)
-                close()
-            }
-        canvas.drawPath(path, glyphPaint)
+        // The path is built around the quiet window's centre, which is where
+        // it is drawn: the window is exactly quietPx square in this state.
+        canvas.drawPath(playPath, glyphPaint)
     }
 
     /** White exclamation mark: running but blind. */
@@ -321,12 +364,8 @@ class OverlayBubble(
         val cy = height / 2f
         val r = quietPx / 2f
         val barHalfW = r * 0.11f
-        canvas.drawRoundRect(
-            RectF(cx - barHalfW, cy - r * 0.52f, cx + barHalfW, cy + r * 0.16f),
-            barHalfW,
-            barHalfW,
-            glyphPaint,
-        )
+        glyphRect.set(cx - barHalfW, cy - r * 0.52f, cx + barHalfW, cy + r * 0.16f)
+        canvas.drawRoundRect(glyphRect, barHalfW, barHalfW, glyphPaint)
         canvas.drawCircle(cx, cy + r * 0.44f, r * 0.13f, glyphPaint)
     }
 
@@ -356,6 +395,10 @@ class OverlayBubble(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // The quiet window is square but the drawn circle is not: a
+                // touch in a transparent corner belongs to the app underneath,
+                // not to the detection toggle.
+                if (params.width == quietPx && !insideCircle(event.x, event.y)) return false
                 downRawX = event.rawX
                 downRawY = event.rawY
                 dragStartX = params.x
@@ -381,6 +424,16 @@ class OverlayBubble(
             }
         }
         return true
+    }
+
+    private fun insideCircle(
+        x: Float,
+        y: Float,
+    ): Boolean {
+        val r = quietPx / 2f
+        val dx = x - r
+        val dy = y - r
+        return dx * dx + dy * dy <= r * r
     }
 
     override fun performClick(): Boolean {

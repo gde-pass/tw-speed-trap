@@ -22,6 +22,8 @@ object DetectionStatus {
     )
 
     data class UiState(
+        /** Start requested, database still loading: the button must not take a second tap. */
+        val starting: Boolean = false,
         val running: Boolean = false,
         val speedKmh: Int? = null,
         val accuracyM: Int? = null,

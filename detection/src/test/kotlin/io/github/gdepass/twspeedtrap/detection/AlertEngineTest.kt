@@ -1,6 +1,7 @@
 package io.github.gdepass.twspeedtrap.detection
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -408,6 +409,34 @@ class AlertEngineTest {
             listOf<AlertEvent>(AlertEvent.AllClear(camera)),
             engine.onFix(fix(camera.lat - 40 * degPerMeterLat)),
         )
+    }
+
+    // ---- bends and configuration -------------------------------------------
+
+    @Test
+    fun `a bend inside the ring does not postpone the alert`() {
+        val engine = AlertEngine(listOf(camera))
+        // 250 m north of the southbound camera, heading east round a bend:
+        // 90° off the enforced direction but plainly upstream on its axis.
+        val onBend = engine.onFix(fix(camera.lat + 250 * degPerMeterLat, bearing = 90.0))
+        assertEquals(1, onBend.size, "upstream on the camera's axis must alert even mid-bend")
+    }
+
+    @Test
+    fun `oncoming rider on the camera's axis never alerts`() {
+        val engine = AlertEngine(listOf(camera))
+        // North of the southbound camera but heading north: upstream on the
+        // axis, yet opposite the enforced direction.
+        assertTrue(engine.onFix(fix(camera.lat + 150 * degPerMeterLat, bearing = 0.0)).isEmpty())
+    }
+
+    @Test
+    fun `a re-arm ring wider than the index coverage is refused`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            AlertEngine(listOf(camera), EngineConfig(highSpeedAlertDistanceM = 700.0, rearmFactor = 1.5))
+        }
+        // The widest the settings allow (600 m × 1.5) still fits.
+        AlertEngine(listOf(camera), EngineConfig(alertDistanceM = 600.0, highSpeedAlertDistanceM = 600.0))
     }
 
     private val degPerMeterLon = 1.0 / 101_560.0

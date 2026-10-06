@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,13 +67,31 @@ fun MainScreen(
     val context = LocalContext.current
     val state by DetectionStatus.state.collectAsStateWithLifecycle()
 
-    // Re-check permission state every time we come back from system dialogs.
+    // Re-check permission state every time we come back from system dialogs,
+    // and when the location toggle flips from the quick-settings shade (the
+    // activity stays resumed, so only the broadcast tells us).
     var permissionRefresh by remember { mutableIntStateOf(0) }
+    var checks by remember { mutableStateOf(SystemChecks.read(context)) }
     LifecycleResumeEffect(Unit) {
-        permissionRefresh++
-        onPauseOrDispose {}
+        checks = SystemChecks.read(context)
+        val receiver =
+            object : android.content.BroadcastReceiver() {
+                override fun onReceive(
+                    c: Context?,
+                    i: Intent?,
+                ) {
+                    checks = SystemChecks.read(context)
+                }
+            }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            android.content.IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onPauseOrDispose { context.unregisterReceiver(receiver) }
     }
-    val checks = remember(permissionRefresh) { SystemChecks.read(context) }
+    LaunchedEffect(permissionRefresh) { checks = SystemChecks.read(context) }
     // Permissions Android will no longer ask for (denied twice, or "don't ask
     // again"): the only way forward is the app's settings page, so the card
     // button must take the rider there instead of silently doing nothing.
@@ -91,8 +111,19 @@ fun MainScreen(
             }
         }
     val requestPermission: (String) -> Unit = { permission ->
-        if (permission in deniedForever) {
-            context.startActivitySafely(context.appSettingsIntent())
+        val notificationsBelow33 =
+            permission == Manifest.permission.POST_NOTIFICATIONS && Build.VERSION.SDK_INT < 33
+        if (permission in deniedForever || notificationsBelow33) {
+            // Below 33 there is no runtime prompt; blocked notifications are
+            // re-enabled on the app's notification settings page.
+            val intent =
+                if (notificationsBelow33) {
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                } else {
+                    context.appSettingsIntent()
+                }
+            context.startActivitySafely(intent)
         } else {
             requested = permission
             // Android 12+ ignores a fine-location request made without coarse
@@ -143,7 +174,11 @@ fun MainScreen(
             )
 
             Spacer(Modifier.weight(1f))
-            StartStopButton(running = state.running, enabled = checks.fineGranted) {
+            StartStopButton(
+                running = state.running,
+                starting = state.starting,
+                enabled = checks.fineGranted && !state.starting,
+            ) {
                 val intent = Intent(context, DetectionService::class.java)
                 if (state.running) {
                     intent.action = DetectionService.ACTION_STOP
@@ -179,46 +214,44 @@ private fun PermissionChecklist(
             buttonLabel = stringResource(if (blocked) R.string.perm_open_settings else grant),
         ) { onRequestPermission(permission) }
     }
-    if (!checks.fineGranted) {
-        requestCard(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            R.string.perm_location_title,
-            R.string.perm_location_body,
-            R.string.perm_location_grant,
-        )
-        return
-    }
-    if (!checks.locationEnabled) {
-        PermissionCard(
-            title = stringResource(R.string.perm_gps_off_title),
-            body = stringResource(R.string.perm_gps_off_body),
-            buttonLabel = stringResource(R.string.perm_gps_off_enable),
-            onClick = onOpenLocationSettings,
-        )
-    }
-    if (!checks.backgroundGranted) {
-        requestCard(
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-            R.string.perm_background_title,
-            R.string.perm_background_body,
-            R.string.perm_background_grant,
-        )
-    }
-    if (!checks.notificationsGranted) {
-        requestCard(
-            Manifest.permission.POST_NOTIFICATIONS,
-            R.string.perm_notifications_title,
-            R.string.perm_notifications_body,
-            R.string.perm_notifications_grant,
-        )
-    }
-    if (!checks.batteryExempt) {
-        PermissionCard(
-            title = stringResource(R.string.perm_battery_title),
-            body = stringResource(R.string.perm_battery_body),
-            buttonLabel = stringResource(R.string.perm_battery_grant),
-            onClick = onRequestBatteryExemption,
-        )
+    // One card at a time, most important first: four stacked cards pushed
+    // the Start button below the fold on most phones.
+    when {
+        !checks.fineGranted ->
+            requestCard(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                R.string.perm_location_title,
+                R.string.perm_location_body,
+                R.string.perm_location_grant,
+            )
+        !checks.locationEnabled ->
+            PermissionCard(
+                title = stringResource(R.string.perm_gps_off_title),
+                body = stringResource(R.string.perm_gps_off_body),
+                buttonLabel = stringResource(R.string.perm_gps_off_enable),
+                onClick = onOpenLocationSettings,
+            )
+        !checks.backgroundGranted ->
+            requestCard(
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                R.string.perm_background_title,
+                R.string.perm_background_body,
+                R.string.perm_background_grant,
+            )
+        !checks.notificationsGranted ->
+            requestCard(
+                Manifest.permission.POST_NOTIFICATIONS,
+                R.string.perm_notifications_title,
+                R.string.perm_notifications_body,
+                R.string.perm_notifications_grant,
+            )
+        !checks.batteryExempt ->
+            PermissionCard(
+                title = stringResource(R.string.perm_battery_title),
+                body = stringResource(R.string.perm_battery_body),
+                buttonLabel = stringResource(R.string.perm_battery_grant),
+                onClick = onRequestBatteryExemption,
+            )
     }
 }
 
@@ -235,8 +268,10 @@ private data class SystemChecks(
             SystemChecks(
                 fineGranted = context.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION),
                 backgroundGranted = context.hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-                notificationsGranted =
-                    Build.VERSION.SDK_INT < 33 || context.hasPermission(Manifest.permission.POST_NOTIFICATIONS),
+                // Covers the runtime permission on 33+ and a user-blocked app
+                // on every version: a blocked foreground notification hides
+                // the Stop action and the location-off warning alike.
+                notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled(),
                 batteryExempt =
                     context
                         .getSystemService(PowerManager::class.java)
@@ -414,6 +449,7 @@ private fun PermissionCard(
 @Composable
 private fun StartStopButton(
     running: Boolean,
+    starting: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
@@ -426,7 +462,14 @@ private fun StartStopButton(
                 .height(72.dp),
     ) {
         Text(
-            text = stringResource(if (running) R.string.btn_stop else R.string.btn_start),
+            text =
+                stringResource(
+                    when {
+                        running -> R.string.btn_stop
+                        starting -> R.string.btn_starting
+                        else -> R.string.btn_start
+                    },
+                ),
             style = MaterialTheme.typography.titleLarge,
         )
     }
