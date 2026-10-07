@@ -48,6 +48,7 @@
     <string name="alert_location_off">Location turned off, alerts disabled</string>
     <string name="alert_location_on">Location restored</string>
     <string name="alert_with_warning">%1$s. Slow down!</string>
+    <string name="alert_section_ahead">Average speed zone in %1$d metres, limit %2$d</string>
     <string name="alert_section_entered">Average speed zone, limit %1$d</string>
     <string name="alert_section_over">Average too high, slow down!</string>
     <string name="alert_section_exited">End of zone, average %1$d</string>

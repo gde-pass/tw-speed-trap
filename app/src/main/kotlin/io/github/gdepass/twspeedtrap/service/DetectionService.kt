@@ -271,6 +271,16 @@ class DetectionService : LifecycleService() {
                 Log.i(TAG, "all clear (${event.camera.id})")
                 if (allClearChimeEnabled) announcer?.playAllClear()
             }
+            is AlertEvent.SectionAhead -> {
+                val text =
+                    localized.getString(
+                        R.string.alert_section_ahead,
+                        roundForSpeech(event.distanceM),
+                        event.section.speedLimitKmh,
+                    )
+                Log.i(TAG, "alert: $text (${event.section.id} at ${event.distanceM.roundToInt()} m)")
+                announcer?.speak(text, chimeEnabled, urgent = true)
+            }
             is AlertEvent.SectionEntered -> {
                 val text = localized.getString(R.string.alert_section_entered, event.section.speedLimitKmh)
                 Log.i(TAG, "alert: $text (${event.section.id})")

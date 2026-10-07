@@ -93,6 +93,9 @@ class AverageSpeedTracker(
             sectionEndpoints.count { it.sectionRole == "end" } - exitsBySection.size
     private var active: Traversal? = null
     private var pending: PendingEntry? = null
+
+    /** Entry gantries announced ahead and not yet re-armed: id → ring that fired. */
+    private val preAlerted = HashMap<String, Double>()
     private var lastReliableBearingDeg: Double? = null
     private var lastReliableBearingTimeMs: Long = Long.MIN_VALUE
     private var lastGeometricFixMs: Long = Long.MIN_VALUE
@@ -113,13 +116,85 @@ class AverageSpeedTracker(
         // Re-check entry on the fix that closed a traversal: chained sections
         // (e.g. 觀音隧道 exit → 谷風 entry, 78 m apart) share bridge fixes.
         val entryEvents = if (active == null) checkEntry(fix) else emptyList()
+        val aheadEvents = if (active == null) checkPreAlerts(fix) else emptyList()
         if (fix.accuracyM <= ACCURACY_GATE_M) lastGeometricFixMs = fix.timestampMs
         updateLiveStatus(fix)
-        return when {
-            entryEvents.isEmpty() -> progressEvents
-            progressEvents.isEmpty() -> entryEvents
-            else -> progressEvents + entryEvents
+        return progressEvents + aheadEvents + entryEvents
+    }
+
+    // ---- pre-alert -----------------------------------------------------------
+
+    /**
+     * "Zone ahead" at the point-camera ring, so the rider can settle on the
+     * limit before the gantry instead of hearing about it at the gantry. Same
+     * rules as a point camera: trusted fix, direction known (no fail-open — a
+     * rider leaving the opposite direction's zone passes this gantry's twin),
+     * gantry still ahead along its axis, once per approach with re-arm
+     * beyond ring × rearmFactor. Inside the entry ball the entry itself speaks.
+     */
+    private fun checkPreAlerts(fix: Fix): List<AlertEvent> {
+        sweepPreAlerted(fix)
+        if (fix.accuracyM > ACCURACY_GATE_M) return emptyList()
+        val travel = effectiveBearing(fix) ?: return emptyList()
+        val ring =
+            if (fix.speedMps * MPS_TO_KMH >= AlertEngine.HIGH_SPEED_THRESHOLD_KMH) {
+                config.highSpeedAlertDistanceM
+            } else {
+                config.alertDistanceM
+            }
+        var best: Pair<Camera, Double>? = null
+        for (entry in entries) {
+            val distance = preAlertDistance(entry, fix, travel, ring) ?: continue
+            if (best == null || distance < best.second) best = entry to distance
         }
+        val (entry, distance) = best ?: return emptyList()
+        preAlerted[entry.id] = ring
+        return listOf(AlertEvent.SectionAhead(sections.getValue(entry.sectionId!!), distance))
+    }
+
+    /** Distance to [entry] when it qualifies for a pre-alert on this fix, else null. */
+    private fun preAlertDistance(
+        entry: Camera,
+        fix: Fix,
+        travel: Double,
+        ring: Double,
+    ): Double? {
+        if (entry.id in preAlerted) return null
+        val outsideBox =
+            abs(fix.lat - entry.lat) > PRE_ALERT_PREFILTER_DEG || abs(fix.lon - entry.lon) > PRE_ALERT_PREFILTER_DEG
+        if (outsideBox) return null
+        val distance = GeoMath.distanceMeters(fix.lat, fix.lon, entry.lat, entry.lon)
+        // Inside the entry ball the entry itself speaks.
+        if (distance > ring || distance <= ENDPOINT_RADIUS_M) return null
+        return if (approaching(entry, travel, fix)) distance else null
+    }
+
+    /** Re-arms by distance on every fix, so a gantry left behind in one jump cannot stay silenced. */
+    private fun sweepPreAlerted(fix: Fix) {
+        if (preAlerted.isEmpty()) return
+        val iterator = preAlerted.entries.iterator()
+        while (iterator.hasNext()) {
+            val (id, ring) = iterator.next()
+            val entry = entries.firstOrNull { it.id == id } ?: continue
+            if (GeoMath.distanceMeters(fix.lat, fix.lon, entry.lat, entry.lon) >
+                ring * config.rearmFactor
+            ) {
+                iterator.remove()
+            }
+        }
+    }
+
+    /** Heading roughly along the gantry's axis and still upstream of it. */
+    private fun approaching(
+        entry: Camera,
+        travel: Double,
+        fix: Fix,
+    ): Boolean {
+        val exit = exitsBySection.getValue(entry.sectionId)
+        val axis = entry.bearingDeg ?: GeoMath.bearingDegrees(entry.lat, entry.lon, exit.lat, exit.lon)
+        if (AlertEngine.angularDifference(travel, axis) > config.bearingToleranceDeg) return false
+        val toGantry = GeoMath.bearingDegrees(fix.lat, fix.lon, entry.lat, entry.lon)
+        return AlertEngine.angularDifference(toGantry, axis) <= HALF_PLANE_DEG
     }
 
     private fun updateLiveStatus(fix: Fix) {
@@ -471,6 +546,9 @@ class AverageSpeedTracker(
 
         /** Bounding-box prefilter (~110 m) so 19 island-wide entries cost comparisons, not haversines. */
         const val ENTRY_PREFILTER_DEG = 0.001
+
+        /** Pre-alert prefilter: covers the widest ring the settings allow (600 m) at Taiwan's latitudes. */
+        const val PRE_ALERT_PREFILTER_DEG = 0.007
         private const val MPS_TO_KMH = 3.6
     }
 }

@@ -66,6 +66,12 @@ sealed interface AlertEvent {
         val camera: Camera,
     ) : AlertEvent
 
+    /** An average-speed zone's entry gantry is ahead within the alert ring; fired once per approach. */
+    data class SectionAhead(
+        val section: Section,
+        val distanceM: Double,
+    ) : AlertEvent
+
     data class SectionEntered(
         val section: Section,
     ) : AlertEvent

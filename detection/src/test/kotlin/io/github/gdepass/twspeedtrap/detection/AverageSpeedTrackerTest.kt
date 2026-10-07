@@ -78,7 +78,10 @@ class AverageSpeedTrackerTest {
 
     private fun tracker() = AverageSpeedTracker(endpoints, mapOf("test" to section))
 
-    private fun replay(fixes: List<Fix>): List<AlertEvent> = fixes.flatMap(tracker()::onFix)
+    /** Traversal events only: the "zone ahead" pre-alert has its own tests below. */
+    private fun replay(fixes: List<Fix>): List<AlertEvent> = fixes.flatMap(tracker()::onFix).withoutPreAlerts()
+
+    private fun List<AlertEvent>.withoutPreAlerts() = filterNot { it is AlertEvent.SectionAhead }
 
     @Test
     fun `live status projects the exit average while inside the section`() {
@@ -161,6 +164,7 @@ class AverageSpeedTrackerTest {
         val events =
             drive(speedKmh = 55.0, gap = 100.0..(lengthM + 900.0), until = lengthM + 1100.0)
                 .flatMap(active::onFix)
+                .withoutPreAlerts()
         assertEquals(1, events.size, "contaminated average must not be announced, got $events")
         assertTrue(events[0] is AlertEvent.SectionEntered)
         assertFalse(active.isActive, "traversal must be cleared so the next entry works")
@@ -218,6 +222,7 @@ class AverageSpeedTrackerTest {
         return positions
             .map { pos -> northboundFix(pos, speedMps, timeMs = ((pos + 100.0) / speedMps * 1000.0).toLong()) }
             .flatMap(chain::onFix)
+            .withoutPreAlerts()
     }
 
     @Test
@@ -573,5 +578,46 @@ class AverageSpeedTrackerTest {
         val tracker = AverageSpeedTracker(endpoints + orphanEntry + duplicateExit, mapOf("test" to section))
         assertEquals(2, tracker.unusableEndpoints)
         assertEquals(0, tracker().unusableEndpoints)
+    }
+
+    // ---- pre-alert -----------------------------------------------------------
+
+    @Test
+    fun `zone ahead is announced once at the ring and the entry still speaks`() {
+        val tracker = AverageSpeedTracker(endpoints, mapOf("test" to section))
+        val events = drive(60.0, from = -600.0, until = 100.0).flatMap(tracker::onFix)
+        val ahead = events.filterIsInstance<AlertEvent.SectionAhead>()
+        assertEquals(1, ahead.size, "one pre-alert per approach")
+        assertTrue(
+            ahead.single().distanceM <= 300.0 && ahead.single().distanceM > 250.0,
+            "fires on the first fix inside the 300 m ring",
+        )
+        assertEquals(1, events.filterIsInstance<AlertEvent.SectionEntered>().size)
+        assertTrue(events.indexOf(ahead.single()) < events.indexOfFirst { it is AlertEvent.SectionEntered })
+    }
+
+    @Test
+    fun `a rider past the gantry or heading the other way gets no pre-alert`() {
+        val tracker = AverageSpeedTracker(endpoints, mapOf("test" to section))
+        // Southbound through the entry gantry from 250 m north of it: upstream
+        // of nothing, and 180° off the enforced direction.
+        var position = 250.0
+        var timeMs = 0L
+        val southbound = mutableListOf<Fix>()
+        while (position > -250.0) {
+            southbound.add(northboundFix(position, 60.0 / 3.6, timeMs, bearing = 180.0))
+            position -= 60.0 / 3.6
+            timeMs += 1000L
+        }
+        assertTrue(southbound.flatMap(tracker::onFix).none { it is AlertEvent.SectionAhead })
+    }
+
+    @Test
+    fun `no direction means no pre-alert`() {
+        val tracker = AverageSpeedTracker(endpoints, mapOf("test" to section))
+        // Crawling toward the gantry with no bearing: the entry logic waits for
+        // displacement, and the pre-alert must not fail open either.
+        val crawl = (0 until 20).map { northboundFix(-280.0 + it * 2.0, 2.0, it * 1000L, bearing = null) }
+        assertTrue(crawl.flatMap(tracker::onFix).none { it is AlertEvent.SectionAhead })
     }
 }
