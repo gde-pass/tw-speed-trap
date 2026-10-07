@@ -44,6 +44,8 @@ from .parse import (
     SOURCE_109336,
     SOURCE_173211,
     SOURCE_178734,
+    SOURCE_38357,
+    SOURCE_100855,
     parse_130111,
     parse_13940,
     parse_156415,
@@ -73,6 +75,8 @@ from .parse import (
     parse_109336,
     parse_173211,
     parse_178734,
+    parse_38357,
+    parse_100855,
 )
 from .sections import load_sections, suppress_section_hint_points
 
@@ -88,6 +92,7 @@ DATASETS = (
     (13940, parse_13940, SOURCE_13940),
     (7320, parse_7320, SOURCE_7320),
     (100856, parse_100856, SOURCE_100856),
+    (100855, parse_100855, SOURCE_100855),
     (130111, parse_130111, SOURCE_130111),
     (25935, parse_25935, SOURCE_25935),
     (178168, parse_178168, SOURCE_178168),
@@ -114,6 +119,7 @@ DATASETS = (
     (109336, parse_109336, SOURCE_109336),
     (178121, parse_178121, SOURCE_178121),
     (178734, parse_178734, SOURCE_178734),
+    (38357, parse_38357, SOURCE_38357),
 )
 
 

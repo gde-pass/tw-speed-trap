@@ -41,6 +41,8 @@ used:
   109336: 新竹縣政府警察局固定式科學儀器執法設備設置地點
   173211: 新竹縣政府警察局固定測速設置地點
   178734: 臺東縣警察局取締違規照相設備暨科技執法偵測設置地點一覽表115.9.30
+  38357: 南投縣政府警察局固定式自動測速照相桿
+  100855: 國道公路警察局交流道區重點違規錄影地點
 
 waiting_for_coordinates:
   53645: 臺南市固定式交通違規照相設備設置地點 — 194 rows, km markers and road names only (2026-10)
@@ -49,6 +51,29 @@ waiting_for_coordinates:
   161852: 嘉義市固定式科技執法自動偵測系統設置地點 — descriptions only, no coordinate columns (2026-09)
 
 seen:
+  128438: 宜蘭縣政府警察局固定式科學儀器執法設備設置地點一覽表  # ghost: indexed by the title search, but the dataset page 500s and the detail API answers 無此資料集; the police list it mirrors has no coordinates (2026-10)
+  31908: 微電腦闖越平交道自動照相機設置地點  # 6 level-crossing cameras, every row 備註 無設置 (not installed) (2026-10)
+  127498: 高雄市109年路口多向違規監測系統設置地點  # no coordinates, superseded by the 115年 series (2026-10)
+  145874: 高雄市110年固定式測照設備設置一覽表第3次公告  # superseded by the 115年 series (2026-10)
+  146886: 高雄市110年固定式測照設備設置一覽表第4次公告  # superseded by the 115年 series (2026-10)
+  151950: 高雄市111年固定式測照設備設置一覽表第3次公告  # superseded by the 115年 series (2026-10)
+  146883: 高雄市110年限制車種違規駛入」監測系統設置地點第4次公告  # vehicle-class ban, no coordinates (2026-10)
+  148456: 高雄市111年「限制車種違規駛入」監測系統設置地點第1次公告  # vehicle-class ban, no coordinates (2026-10)
+  150809: 高雄市111年「限制車種違規駛入」監測系統設置地點第2次公告  # vehicle-class ban, no coordinates (2026-10)
+  151948: 高雄市111年「限制車種違規駛入」監測系統設置地點第3次公告  # vehicle-class ban, no coordinates (2026-10)
+  146882: 高雄市110違規停車監測系統設置地點第4次公告  # parking enforcement (2026-10)
+  148457: 高雄市111年「違規停車」監測系統設置地點第1次公告  # parking enforcement (2026-10)
+  150808: 高雄市111年「違規停車」監測系統設置地點第2次公告  # parking enforcement (2026-10)
+  151947: 高雄市111年「違規停車」監測系統設置地點第3次公告  # parking enforcement (2026-10)
+  173697: 彰化縣固定式聲音照相設置點  # noise cameras (2026-10)
+  156743: 臺南市常有聲音照相設備設置地點  # noise cameras (2026-10)
+  176021: 南投縣政府警察局固定式科學儀器交通執法設備  # 2 rows, 砂石車 ban enforcement only (2026-10)
+  106636: 國道公路警察局交岔路口重點違規錄影地點  # km markers only, no coordinates (2026-10)
+  124139: 違規停車自動偵測系統設置地點  # 新北 parking enforcement, not a moving-traffic camera (2026-10)
+  173210: 新竹縣政府警察局違規停車自動執法設備設置地點  # parking enforcement (2026-10)
+  176553: 高雄市115年「違規停車」監測系統設置地點  # parking enforcement (2026-10)
+  178140: 嘉義縣警察局固定式科技執法設置地點  # host ws-tm.cyhg.gov.tw only negotiates legacy TLS (SECLEVEL 0); 13 rows, 1 new (2026-10)
+  178143: 嘉義縣警察局固定式測速照相相關設置地點  # same host; 14 rows, 0 new (2026-10)
   169929: 省道測速取締圖資省道測速取締圖資  # 交通部公路局; the download sits behind an Incapsula bot wall (HTML challenge), unreachable for scripts (2026-10)
   67491: 新竹市違規自動照相固定桿設置地點  # host odws.hccg.gov.tw unreachable from here and CI; 178144 covers 新竹市 (2026-10)
   98101: 高雄市107年固定式違規照相設備設置地點  # superseded by the 115年 series (2026-10)
@@ -71,10 +96,9 @@ seen:
   113544: 雷達測速儀檢查合格單資料集  # instrument certification, not locations (2026-10)
   13908: 測速執法點取締件數資料
   26835: 新北市固定式測速照相  # city-wide 新北 dataset, delisted from data.gov.tw
-  38357: 南投縣政府警察局固定式自動測速照相桿  # host data.nantou.gov.tw drops connections (2026-08)
   47106: 高雄市105年度取締闖紅燈前十大路口
   47206: 高雄市104年度取締闖紅燈前十大路口
-  52544: 嘉義市固定式測速照相及闖紅燈照相設置地點  # evaluated 2026-08: zero points >50 m from national data
+  52544: 嘉義市固定式測速照相及闖紅燈照相設置地點  # re-checked 2026-10 (115年4月 list, 11 rows with coordinates): zero points >45 m from the database
   85425: 高雄市106年度取締闖紅燈前十大路口
   87264: 高雄市105年度測速照相桿  # 105年 list without coordinates; superseded by the 115年 series (2026-09)
   100857: 雪山隧道自動化科技執法系統設置地點  # km-markers only, no coordinates — 國道5 section system, sections.yaml candidate (2026-08)

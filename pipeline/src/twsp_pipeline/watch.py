@@ -3,11 +3,13 @@ used datasets that stopped resolving, and skipped datasets that gained
 coordinate columns. The dataset-watch workflow opens a GitHub issue whenever
 the report contains findings.
 
-Known blind spot: the catalog export omits datasets harvested from municipal
-platforms (data.taipei, data.tainan.gov.tw, …) — roughly a third of the
-catalog. Sources we already use are covered by the per-id existence check
-instead; genuinely new municipal-platform datasets stay invisible until
-data.gov.tw lists them in the export.
+The catalog export omits datasets harvested from municipal platforms
+(data.taipei, data.tainan.gov.tw, …) — roughly a third of the catalog — so a
+second channel asks the portal's live title search (the dropdown behind the
+search box, `/api/front/dataset/dropdown`) for every keyword in TITLE_TERMS.
+That is how 臺中's 83881 and 宜蘭's 128438 were found in 2026-10 after a year
+of being invisible to the export. Sources we already use are covered by the
+per-id existence check.
 """
 
 import argparse
@@ -23,6 +25,10 @@ from .decode import decode_bytes
 from .fetch import DATASET_API, FetchError, _get, _get_json, download, extract_csv_payloads, resolve_csv_url
 
 CATALOG_EXPORT_URL = "https://data.gov.tw/datasets/export/csv?type=dataset"
+TITLE_SEARCH_URL = "https://data.gov.tw/api/front/dataset/dropdown?list_type=published&qs={term}"
+# Title fragments the live search is asked for; the regex in the baseline then
+# filters the hits like catalog rows (the search itself is a plain substring).
+TITLE_TERMS = ("測速", "科學儀器", "照相", "科技執法", "闖紅燈", "區間平均", "違規照相", "執法設備", "取締地點")
 COORD_COLUMNS = re.compile(r"經度|緯度|座標|lat|lon", re.IGNORECASE)
 
 FINDINGS_SENTINEL = "DATASET-WATCH: FINDINGS"
@@ -42,6 +48,27 @@ def catalog_matches(catalog_csv: str, keywords: re.Pattern) -> dict[str, str]:
         for row in reader
         if keywords.search(row["資料集名稱"] or "")
     }
+
+
+def title_search_matches(keywords: re.Pattern) -> dict[str, str]:
+    """id -> title from the portal's live title search, one query per term in
+    TITLE_TERMS. A term whose request fails is skipped (the export still
+    covers most of the catalog); a shape change raises so the workflow goes
+    red instead of reporting "nothing new upstream"."""
+    found: dict[str, str] = {}
+    for term in TITLE_TERMS:
+        try:
+            payload = _get_json(TITLE_SEARCH_URL.format(term=term)).get("payload")
+        except FetchError:
+            continue
+        if not isinstance(payload, list):
+            raise SystemExit(f"title search response shape changed for {term!r}: {str(payload)[:120]}")
+        for item in payload:
+            title = str(item.get("title") or "").strip()
+            nid = str(item.get("nid") or "")
+            if nid.isdigit() and keywords.search(title):
+                found[nid] = title
+    return found
 
 
 def new_datasets(matches: dict[str, str], baseline: dict) -> dict[str, str]:
@@ -119,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
         # must not crash the monthly watch.
         catalog_csv = decode_bytes(_get(CATALOG_EXPORT_URL))
     matches = catalog_matches(catalog_csv, keywords)
+    matches.update(title_search_matches(keywords))
     print(f"catalog: {len(matches)} keyword-matching datasets", file=sys.stderr)
 
     fresh = new_datasets(matches, baseline)

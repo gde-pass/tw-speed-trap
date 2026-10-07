@@ -32,6 +32,8 @@ from twsp_pipeline.parse import (
     parse_109336,
     parse_173211,
     parse_178734,
+    parse_38357,
+    parse_100855,
 )
 
 # Header carries a DOUBLE BOM; 經度 holds latitude (~24.x) and 緯度 longitude;
@@ -511,3 +513,32 @@ def test_178734_two_devices_in_one_row():
     assert {cam.type for cam in cameras} == {"red_light"}
     assert {cam.bearing for cam in cameras} == {None}  # 東向西、西向東 → both directions
     assert len({cam.id for cam in cameras}) == 2
+
+
+CSV_38357 = """行政區,設置地點,取締項目,拍攝方向,限速（km／hr）,轄區分局,經度,緯度
+南投市,南崗三路及成功三路口,超速、闖紅燈、違規（臨）停車、不依標誌、標線、號誌指示行駛、多車道右（左）轉彎，不先駛入外（內）側車道,南北雙向,60,南投分局,120.667283,23.930708
+南投市,臺3線215.5公里處,超速,東西南北,砂石車50其他車種60,南投分局,120.689876,23.888296
+"""
+
+
+def test_38357_nantou_limit_column_and_multi_direction():
+    cameras, unresolved, _ = parse_38357(CSV_38357, "2026-10-07")
+    assert not unresolved
+    assert [cam.city for cam in cameras] == ["南投縣", "南投縣"]
+    assert cameras[0].type == "fixed" and cameras[0].speed_limit == 60 and cameras[0].bearing is None
+    assert cameras[0].description == "南投市 南崗三路及成功三路口"
+    assert cameras[1].bearing is None  # 東西南北: every direction
+    assert cameras[1].speed_limit is None  # per-vehicle-class limit text
+
+
+CSV_100855 = """設備編號,型式,縣市,行政區,科技執法種類,取締項目,設置區域描述,設置地點(路口或路段),座標緯度,座標經度,拍攝方向,速限,管轄單位
+1,高解析度攝影鏡頭,,,交流道區重點違規錄影,跨越槽化線、跨越雙白線、未繫安全帶,林口A交流道,國道1號南向40.5 公里,25.065853,121.372111,南往北,,國道公路警一隊
+"""
+
+
+def test_100855_interchange_cameras_are_tech_on_the_freeway():
+    cameras, unresolved, _ = parse_100855(CSV_100855, "2026-10-07")
+    assert not unresolved
+    (cam,) = cameras
+    assert cam.type == "tech" and cam.city == "國道" and cam.bearing == 0.0 and cam.speed_limit is None
+    assert cam.description == "國道1號南向40.5 公里"

@@ -13,6 +13,8 @@ they change over time):
 - [100856](https://data.gov.tw/dataset/100856) 國道公路警察局闖紅燈照相地點 —
   freeway-police red-light cameras on interchange ramps (corridor-checked
   against the freeway's kilometre-marker rows)
+- [100855](https://data.gov.tw/dataset/100855) 國道公路警察局交流道區重點違規錄影地點 —
+  freeway-police lane-line cameras at interchanges (`tech`)
 - [130111](https://data.gov.tw/dataset/130111) 臺北市固定測速照相地點表 —
   Taipei fixed cameras; red-light-only devices become `red_light`
 - [135957](https://data.gov.tw/dataset/135957) 臺北市智慧管理科技執法設備資料表 —
@@ -48,7 +50,8 @@ they change over time):
   [109336](https://data.gov.tw/dataset/109336) 新竹縣,
   [178121](https://data.gov.tw/dataset/178121) 金門,
   [178734](https://data.gov.tw/dataset/178734) 臺東 (three Big5 files behind
-  one resource URL)
+  one resource URL),
+  [38357](https://data.gov.tw/dataset/38357) 南投
 
 Average-speed (區間測速) rows in any source are excluded from point import —
 sections are hand-curated in `data/sections.yaml` with entry/exit pairs.

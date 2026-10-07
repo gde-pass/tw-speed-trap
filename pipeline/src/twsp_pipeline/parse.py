@@ -42,6 +42,8 @@ SOURCE_27969 = "gov.tw:27969"
 SOURCE_109336 = "gov.tw:109336"
 SOURCE_173211 = "gov.tw:173211"
 SOURCE_178734 = "gov.tw:178734"
+SOURCE_38357 = "gov.tw:38357"
+SOURCE_100855 = "gov.tw:100855"
 
 
 class SchemaError(RuntimeError):
@@ -504,6 +506,7 @@ def parse_177827(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
 _KIND_COLS = ("科技執法種類", "種類")
 _LAT_COLS = ("座標緯度", "緯度")
 _LON_COLS = ("座標經度", "經度")
+_LIMIT_COLS = ("速限", "限速（km／hr）", "限速")
 
 
 def _first_present(candidates: tuple[str, ...], fields: set[str]) -> str:
@@ -549,7 +552,8 @@ def _parse_county_standard(
     kind_col = _first_present(_KIND_COLS, fields)
     lat_col = _first_present(_LAT_COLS, fields)
     lon_col = _first_present(_LON_COLS, fields)
-    required = {"行政區", place_col, items_col, lat_col, lon_col, "拍攝方向", "速限"}
+    limit_col = _first_present(_LIMIT_COLS, fields)
+    required = {"行政區", place_col, items_col, lat_col, lon_col, "拍攝方向", limit_col}
     if city is None:
         required.add("縣市")
     _require_columns(reader.fieldnames, required, source)
@@ -587,7 +591,7 @@ def _parse_county_standard(
                     lat=lat,
                     lon=lon,
                     type=cam_type,
-                    speed_limit=parse_limit(row.get("速限")),
+                    speed_limit=parse_limit(row.get(limit_col)),
                     bearing=bearing,
                     city=city if city is not None else (row.get("縣市") or "").strip(),
                     description=description,
@@ -869,3 +873,19 @@ def parse_178734(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
     (normalize_coords un-swaps them). The 區間 rows list both gantries as
     "lat1,lat2" and are excluded as sections (curated in sections.yaml)."""
     return _parse_county_standard(text, today, SOURCE_178734, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)
+
+
+def parse_38357(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Nantou fixed cameras (南投縣政府警察局固定式自動測速照相桿): bare 緯度/經度,
+    the limit column is 限速（km／hr）, no 縣市 column, and multi-direction poles
+    are tagged 東西南北 (no bearing → both directions). Its host dropped
+    connections through 2026-08; the snapshot fallback covers relapses."""
+    return _parse_county_standard(text, today, SOURCE_38357, ("設置地點",), ("取締項目",), city="南投縣")
+
+
+def parse_100855(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """Freeway-police interchange cameras (國道公路警察局交流道區重點違規錄影地點):
+    lane-line and chevron-crossing enforcement at 25 interchanges, county-standard
+    columns with an empty 縣市. All rows are `tech`; the 國道N號 description
+    keeps the row inside freeway_check's corridor rule."""
+    return _parse_county_standard(text, today, SOURCE_100855, _SUFFIXED_PLACE_COLS, ("取締項目",), city="國道")

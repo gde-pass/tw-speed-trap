@@ -152,6 +152,20 @@ photograph. Recorded as unusable: 省道 169929 (Incapsula bot wall), 臺南
 into the `sections.yaml` candidates (新北 126156 has both gantries per
 direction and is the best next section batch).
 
+The national follow-up sweep (same month) went through the portal's live
+title search — `/api/front/dataset/dropdown?qs=…`, which indexes the
+municipal-platform datasets the export omits — for a dozen terms, and through
+each county's own portal where one answers. Integrated 南投 38357 (its host
+answers again; 36 rows, +8) and the freeway interchange lane-line cameras
+100855 (+18 after the marker check dropped 7 mislocated rows). Everything
+else was either already covered (嘉義市 52544 now carries coordinates but
+every point is within 45 m of the database), superseded Kaohsiung editions,
+parking/noise/vehicle-class enforcement, or unreachable: 嘉義縣 178140/178143
+only negotiate legacy TLS (1 new point — not worth a security downgrade), and
+宜蘭 128438 is a ghost (indexed, but the dataset page and API return "無此資料集";
+the police list has no coordinates). The watch now runs the title search on
+every monthly pass, so the export blind spot is closed.
+
 Upstream monitoring is automated: the monthly `dataset-watch` workflow diffs
 the data.gov.tw catalog against `pipeline/data/dataset_watch.yaml`, checks
 that used datasets still resolve, re-checks coordinate-less ones (Tainan
