@@ -1,0 +1,35 @@
+# Curated row drops — the last resort for a source row whose coordinate is
+# wrong but which the automatic checks (districts.py, freeway_check.py) cannot
+# catch because the point still lies inside the right township. Every entry
+# names the source that holds the same camera at the right place (`keep`), so
+# the camera itself stays in the database and only the phantom goes, and cites
+# the evidence: reverse geocoding of both copies (nominatim, 2026-10) — the
+# dropped copy's nearest road is not the road the description names, the kept
+# copy's is. Matching is exact on (source, description); a drop that matches
+# no row any more is reported by the build (upstream fixed or renamed it) and
+# should then be deleted here.
+drop:
+  - source: gov.tw:7320
+    description: 北屯區北屯路與松竹路口(往市區方向)
+    keep: gov.tw:83881
+    evidence: 7320 point (24.19758,120.74822) sits on 東山路二段 in the 大坑 hills, 5.0 km from 北屯路×松竹路; 83881 (24.18160,120.70176) is on 北屯路.
+  - source: gov.tw:7320
+    description: 西區五權西一街與五權西路一段
+    keep: gov.tw:83881
+    evidence: 7320 point (24.14296,120.65723) is on 福人街, 765 m west; 83881 (24.14012,120.66409) is on 五權西路一段.
+  - source: gov.tw:7320
+    description: 豐原區豐原大道八段(愛心紀念公園前)
+    keep: gov.tw:83881
+    evidence: 7320 point (24.24755,120.70664) is on 成功路, 991 m south; 83881 (24.25644,120.70613) is on 豐原大道八段.
+  - source: gov.tw:83881
+    description: 西屯區臺灣大道四段近東大路一段(側門慢車道)
+    keep: gov.tw:7320
+    evidence: 83881 point (24.19256,120.60680) is on 西屯路三段, 1148 m north; 7320 (24.18294,120.60272) is on 臺灣大道四段.
+  - source: gov.tw:83881
+    description: 梧棲區中華路一段(台1線168.5K)
+    keep: gov.tw:7320
+    evidence: 83881 point (24.25798,120.53960) is on 港埠路二段, 2533 m north; 7320 (24.23666,120.54833) is on 中華路一段.
+  - source: gov.tw:83881
+    description: 霧峰區環河路一段近638號
+    keep: gov.tw:7320
+    evidence: 83881 point (24.07509,120.69996) is on 中正路 in 霧峰, 4317 m east; 7320 (24.08532,120.65899) is on 環河路一段 (filed as 大里區 / 環河路一段638號).

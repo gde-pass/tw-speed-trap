@@ -11,9 +11,11 @@ from pathlib import Path
 from .decode import decode_bytes
 from .dedupe import collapse_id_duplicates, dedupe
 from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
-from .fetch import FetchError, download, extract_csv_payloads, resolve_csv_urls
+from .districts import Districts, check_districts
+from .fetch import DirectDataset, FetchError, download, extract_csv_payloads, resolve_csv_urls
 from .freeway_check import check_freeway_markers
 from .model import Camera, Unresolved
+from .overrides import apply_overrides, load_overrides
 from .parse import (
     SOURCE_130111,
     SOURCE_156415,
@@ -46,6 +48,9 @@ from .parse import (
     SOURCE_178734,
     SOURCE_38357,
     SOURCE_100855,
+    SOURCE_164507,
+    SOURCE_ELAND_FIXED,
+    SOURCE_ELAND_TECH,
     parse_130111,
     parse_13940,
     parse_156415,
@@ -77,6 +82,9 @@ from .parse import (
     parse_178734,
     parse_38357,
     parse_100855,
+    parse_164507,
+    parse_eland_fixed,
+    parse_eland_tech,
 )
 from .sections import load_sections, suppress_section_hint_points
 
@@ -87,7 +95,24 @@ from .sections import load_sections, suppress_section_hint_points
 # speed twins keep their equipment ids, 176549 before the other Kaohsiung sets
 # for the same reason, 83881 (bearing + limit) before Taichung's bearingless
 # tech list 170673, 27969 (speed + red-light) before 彰化's tech list 172905,
-# 173211 (speed) before 新竹縣's junction list 109336.
+# 173211 (speed) before 新竹縣's junction list 109336. County-portal
+# DirectDatasets (宜蘭) sit last: they overlap nothing but 7320.
+ELAND_FIXED = DirectDataset(
+    "e-land:fixed",
+    "opendata.e-land.gov.tw",
+    (
+        "https://opendata.e-land.gov.tw/dataset/f96c8f5c-b518-40b7-9569-a32684667f74/resource/"
+        "dac80758-f548-4f2e-aaa4-8ba5a503a5cb/download/119017-2026-07-22-1784701530.csv",
+    ),
+)
+ELAND_TECH = DirectDataset(
+    "e-land:tech",
+    "opendata.e-land.gov.tw",
+    (
+        "https://opendata.e-land.gov.tw/dataset/50161349-5feb-4629-8bb7-ff20ea4cd9a9/resource/"
+        "02db4726-bdf0-4c34-86fd-f6814fcc8cf9/download/119017-2026-07-22-1784701769.csv",
+    ),
+)
 DATASETS = (
     (13940, parse_13940, SOURCE_13940),
     (7320, parse_7320, SOURCE_7320),
@@ -97,6 +122,7 @@ DATASETS = (
     (25935, parse_25935, SOURCE_25935),
     (178168, parse_178168, SOURCE_178168),
     (135957, parse_135957, SOURCE_135957),
+    (164507, parse_164507, SOURCE_164507),
     (83881, parse_83881, SOURCE_83881),
     (170673, parse_170673, SOURCE_170673),
     (176549, parse_176549, SOURCE_176549),
@@ -120,6 +146,8 @@ DATASETS = (
     (178121, parse_178121, SOURCE_178121),
     (178734, parse_178734, SOURCE_178734),
     (38357, parse_38357, SOURCE_38357),
+    (ELAND_FIXED, parse_eland_fixed, SOURCE_ELAND_FIXED),
+    (ELAND_TECH, parse_eland_tech, SOURCE_ELAND_TECH),
 )
 
 
@@ -145,9 +173,14 @@ def load_previous_snapshot(db_path: Path, source: str) -> list[Camera] | None:
     return [Camera(*row) for row in rows] or None
 
 
-def _fetch_texts(dataset_id: int, cache_dir: Path | None) -> list[str]:
+def dataset_key(dataset: int | DirectDataset) -> str:
+    return str(dataset) if isinstance(dataset, int) else dataset.key
+
+
+def _fetch_texts(dataset: int | DirectDataset, cache_dir: Path | None) -> list[str]:
     """Decoded CSV texts of every resource file the dataset publishes. Cached
     as one ZIP-free blob per URL (<id>.bin, <id>.1.bin, …)."""
+    dataset_id = dataset_key(dataset)
     cache_file = cache_dir / f"{dataset_id}.bin" if cache_dir else None
     if cache_file and cache_file.exists():
         raws = [cache_file.read_bytes()]
@@ -158,7 +191,7 @@ def _fetch_texts(dataset_id: int, cache_dir: Path | None) -> list[str]:
         print(f"  using cached download: {cache_file} (+{len(raws) - 1})")
     else:
         raws = []
-        for index, url in enumerate(resolve_csv_urls(dataset_id)):
+        for index, url in enumerate(resolve_csv_urls(dataset)):
             print(f"  resolved URL: {url}")
             raw = download(url)
             raws.append(raw)
@@ -188,6 +221,18 @@ def main(argv: list[str] | None = None) -> int:
         help="previous database used to keep a source's rows when its host is unreachable",
     )
     parser.add_argument(
+        "--districts",
+        type=Path,
+        default=Path("pipeline/data/districts.json"),
+        help="township boundaries for the district sanity check (tools/build_districts.py)",
+    )
+    parser.add_argument(
+        "--overrides",
+        type=Path,
+        default=Path("pipeline/data/overrides.yaml"),
+        help="curated per-row drops (see the file's header)",
+    )
+    parser.add_argument(
         "--min-count",
         type=int,
         default=2000,
@@ -204,10 +249,10 @@ def main(argv: list[str] | None = None) -> int:
     stats: Counter = Counter()
 
     stale_sources: list[tuple[str, str]] = []
-    for dataset_id, parse_fn, source in DATASETS:
-        print(f"dataset {dataset_id}:")
+    for dataset, parse_fn, source in DATASETS:
+        print(f"dataset {dataset_key(dataset)}:")
         try:
-            texts = _fetch_texts(dataset_id, args.cache)
+            texts = _fetch_texts(dataset, args.cache)
         except FetchError as e:
             print(f"  FETCH FAILED: {e}")
             previous = load_previous_snapshot(args.fallback_db, source)
@@ -232,6 +277,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"freeway marker check: dropped {sum(freeway_dropped.values())} ({dict(freeway_dropped)})")
         for line in freeway_report:
             print(f"  {line}")
+    all_cameras, district_unresolved, district_dropped, district_report = check_districts(
+        all_cameras, Districts.load(args.districts)
+    )
+    all_unresolved.extend(district_unresolved)
+    if district_dropped:
+        print(f"district check: dropped {sum(district_dropped.values())} mislocated rows ({dict(district_dropped)})")
+        for line in district_report:
+            print(f"  {line}")
+    all_cameras, override_dropped, unmatched_overrides = apply_overrides(all_cameras, load_overrides(args.overrides))
+    if override_dropped:
+        print(f"curated overrides: dropped {sum(override_dropped.values())} rows ({dict(override_dropped)})")
+    for entry in unmatched_overrides:
+        print(f"  WARNING: override matched no row — upstream changed? {entry['source']} {entry['description']!r}")
     deduped, dropped = dedupe(all_cameras)
     print(f"dedupe: kept {len(deduped)}, dropped {sum(dropped.values())} ({dict(dropped)})")
 

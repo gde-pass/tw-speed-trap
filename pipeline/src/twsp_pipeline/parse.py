@@ -44,6 +44,10 @@ SOURCE_173211 = "gov.tw:173211"
 SOURCE_178734 = "gov.tw:178734"
 SOURCE_38357 = "gov.tw:38357"
 SOURCE_100855 = "gov.tw:100855"
+SOURCE_164507 = "gov.tw:164507"
+# County-portal sources (fetch.DirectDataset): not data.gov.tw ids.
+SOURCE_ELAND_FIXED = "e-land:fixed"
+SOURCE_ELAND_TECH = "e-land:tech"
 
 
 class SchemaError(RuntimeError):
@@ -66,6 +70,18 @@ def _is_section(text: str) -> bool:
     """區間測速 / 區間平均速率執法 rows are average-speed sections: they need
     curated entry/exit pairs (pipeline/data/sections.yaml), not point alerts."""
     return "區間" in text
+
+
+# Enforcement that never concerns a moving rider: parking (違規停車, 違規(臨時)
+# 停車) and vehicle-class bans (禁行大貨車/聯結車, 限制車種). A row whose every
+# item is one of these is skipped — the same call the baseline made when it
+# declined 高雄's 限制車種 and 違規停車 datasets — and counted in the stats.
+_NON_MOVING = re.compile(r"停車|禁行(?:大貨車|聯結車|大型車|砂石車|貨車)|限制車種|車種(?:管制|限制)")
+
+
+def _only_non_moving(items: str) -> bool:
+    parts = [p for p in re.split(r"[、，,/;；]", items) if p.strip()]
+    return bool(parts) and all(_NON_MOVING.search(p) for p in parts)
 
 
 def parse_7320(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
@@ -557,7 +573,7 @@ def _parse_county_standard(
     if city is None:
         required.add("縣市")
     _require_columns(reader.fieldnames, required, source)
-    dataset_id = source.rsplit(":", 1)[-1]
+    dataset_id = source.split(":", 1)[1] if source.startswith("gov.tw:") else source
     cameras: list[Camera] = []
     unresolved: list[Unresolved] = []
     stats: Counter = Counter()
@@ -566,6 +582,9 @@ def _parse_county_standard(
         kind = (row.get(kind_col) or "").strip()
         if _is_section(items) or _is_section(kind):
             stats[f"{dataset_id}_sections_excluded"] += 1
+            continue
+        if _only_non_moving(items):
+            stats[f"{dataset_id}_non_moving_skipped"] += 1
             continue
         if "超速" in items or "測速" in items:
             cam_type = "fixed"
@@ -889,3 +908,69 @@ def parse_100855(text: str, today: str) -> tuple[list[Camera], list[Unresolved],
     columns with an empty 縣市. All rows are `tech`; the 國道N號 description
     keeps the row inside freeway_check's corridor rule."""
     return _parse_county_standard(text, today, SOURCE_100855, _SUFFIXED_PLACE_COLS, ("取締項目",), city="國道")
+
+
+def parse_164507(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """New Taipei intersection enforcement (路口安全自動偵測系統設置地點): English
+    headers like 7320's, one `item` list per row (闖紅燈, 不停讓行人, 跨越雙白線,
+    禁行大貨車 …). Rows enforcing only parking or heavy-vehicle bans are
+    skipped; `direct` is blank on most rows (both directions)."""
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    _require_columns(
+        reader.fieldnames, {"cityname", "regionname", "location", "item", "latitude", "longitude", "direct"}, SOURCE_164507
+    )
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        items = (row.get("item") or "").strip()
+        description = (row.get("location") or "").strip()
+        if _is_section(items) or _is_section(description):
+            stats["164507_sections_excluded"] += 1
+            continue
+        if _only_non_moving(items):
+            stats["164507_non_moving_skipped"] += 1
+            continue
+        if "超速" in items or "測速" in items:
+            cam_type = "fixed"
+        elif "闖紅燈" in items:
+            cam_type = "red_light"
+        else:
+            cam_type = "tech"
+        area = (row.get("regionname") or "").strip()
+        if area and area not in description:
+            description = f"{area} {description}".strip()
+        bearing = parse_bearing(row.get("direct"))
+        try:
+            lat, lon = normalize_coords(row.get("latitude"), row.get("longitude"))
+        except CoordinateError as e:
+            unresolved.append(Unresolved(SOURCE_164507, str(e), dict(row)))
+            continue
+        stats[f"164507_type:{cam_type}"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(SOURCE_164507, lat, lon, bearing),
+                lat=lat,
+                lon=lon,
+                type=cam_type,
+                speed_limit=None,
+                bearing=bearing,
+                city=(row.get("cityname") or "").strip(),
+                description=description,
+                source=SOURCE_164507,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats
+
+
+def parse_eland_fixed(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """宜蘭 fixed cameras (警察局科學儀器執法設備設置地點(固定式), county portal):
+    county-standard columns; most rows list 北向南、南向北 so bearings are null."""
+    return _parse_county_standard(text, today, SOURCE_ELAND_FIXED, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)
+
+
+def parse_eland_tech(text: str, today: str) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """宜蘭 intersection enforcement (…設置地點(科技執法), county portal): same
+    shape plus 科技執法種類; parking-only rows are skipped."""
+    return _parse_county_standard(text, today, SOURCE_ELAND_TECH, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)

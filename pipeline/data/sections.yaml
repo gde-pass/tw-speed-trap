@@ -471,6 +471,26 @@ sections:
 #       壽卡 (22.2779495,120.8645642)↔(22.254910,120.841083), within ~25 m of
 #       the curated points; use them as the cross-check when revisiting.
 #
+# From the 2026-10 county-portal sweep — 宜蘭 opendata.e-land.gov.tw dataset
+# e979866f 科學儀器執法設備設置地點(區間測速): one coordinate per row (the
+# entry gantry of that direction), limit, km range. The 7320 witnesses only
+# gave the southbound 觀音/谷風 zones curated above; 觀音隧道 is enforced as
+# three consecutive zones per direction, so the curated single bore zone is a
+# simplification to revisit with these gantries:
+#  台9線68k+600m至56k+600m南往北 — limit 40, 南向北, 頭城鎮, gantry 24.849023,121.793895
+#  台9線56k+600m至68k+600m北往南 — limit 40, 北向南, 頭城鎮, gantry 24.865317,121.775863
+#  台9線108k+269m至南澳鄉台9線110k+995m(東澳隧道南下) — limit 70, 北向南, 蘇澳鎮, gantry 24.560524,121.842328
+#  台9線110k+960m至蘇澳鎮台9線108k+224m(東澳隧道北上) — limit 70, 南向北, 南澳鄉, gantry 24.536792,121.836654
+#  台9線129k+404m至131k+860m(觀音隧道南下) — limit 70, 北向南, 南澳鄉, gantry 24.433311,121.77481
+#  台9線131k+860m至134k+538m(觀音隧道南下) — limit 70, 北向南, 南澳鄉, gantry 24.390111,121.78547
+#  台9線134k+538m至136k+883m(觀音隧道南下) — limit 70, 北向南, 南澳鄉, gantry 24.369637,121.780304
+#  台9線136k+912m至134k+405m(觀音隧道北上) — limit 70, 南向北, 南澳鄉, gantry 24.369045,121.780426
+#  台9線134k+405m至131k+849m(觀音隧道北上) — limit 70, 南向北, 南澳鄉, gantry 24.390937,121.785707
+#  台9線131k+849m至129k+360m(觀音隧道北上) — limit 70, 南向北, 南澳鄉, gantry 24.413862,121.786074
+#  台9線137k+295m至141k+458m(谷風隧道南下) — limit 70, 北向南, 南澳鄉, gantry 24.365218,121.777975
+#  台9線141k+420m至137k+205m(谷風隧道北上) — limit 70, 南向北, 南澳鄉, gantry 24.560524,121.842328
+#       (that last coordinate repeats the 東澳隧道南下 row — an upstream copy-paste; use OSM portals)
+#
 # From the 2026-08 county sweep (datasets 144579 屏東, 100857 雪山隧道 —
 # both publish descriptions/km-markers only, no coordinates):
 #  台1  戰備跑道 429.5K→433K 南向 / 433K→429.5K 北向 (limit 70) — 屏東

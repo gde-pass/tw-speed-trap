@@ -43,6 +43,18 @@ used:
   178734: 臺東縣警察局取締違規照相設備暨科技執法偵測設置地點一覽表115.9.30
   38357: 南投縣政府警察局固定式自動測速照相桿
   100855: 國道公路警察局交流道區重點違規錄影地點
+  164507: 路口安全自動偵測系統設置地點  # 新北市 intersection tech enforcement (闖紅燈/不停讓行人/…), 110 rows with coordinates; surfaced by the title-search terms 偵測/設置地點 (2026-10)
+
+# County portals that data.gov.tw does not index: fetched by URL (cli.DIRECT
+# datasets). The watch GETs each URL every run and reports one that stops
+# answering. 宜蘭's three lists were invisible to every data.gov.tw channel
+# (the title search only knew the ghost 128438) — found by asking the county
+# CKAN API (/api/3/action/package_search) directly (2026-10).
+direct:
+  e-land:fixed: https://opendata.e-land.gov.tw/dataset/f96c8f5c-b518-40b7-9569-a32684667f74/resource/dac80758-f548-4f2e-aaa4-8ba5a503a5cb/download/119017-2026-07-22-1784701530.csv
+  e-land:tech: https://opendata.e-land.gov.tw/dataset/50161349-5feb-4629-8bb7-ff20ea4cd9a9/resource/02db4726-bdf0-4c34-86fd-f6814fcc8cf9/download/119017-2026-07-22-1784701769.csv
+  # e-land 區間測速 (dataset e979866f, resource 0ef5b002): 12 rows, one gantry
+  # coordinate per direction — recorded as sections.yaml candidates, not ingested.
 
 waiting_for_coordinates:
   53645: 臺南市固定式交通違規照相設備設置地點 — 194 rows, km markers and road names only (2026-10)

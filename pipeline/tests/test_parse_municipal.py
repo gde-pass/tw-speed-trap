@@ -542,3 +542,58 @@ def test_100855_interchange_cameras_are_tech_on_the_freeway():
     (cam,) = cameras
     assert cam.type == "tech" and cam.city == "國道" and cam.bearing == 0.0 and cam.speed_limit is None
     assert cam.description == "國道1號南向40.5 公里"
+
+
+CSV_164507 = """seqno,cityname,regionname,location,deptnm,branchnm,item,latitude,longitude,direct
+1,新北市,八里區,八里區商港一路與商港路(往八里),新北市政府警察局,蘆洲分局,禁行大貨車,25.146701,121.394841," "
+4,新北市,八里區,八里區賢三街與埤頭一街、二街(賢三街雙向),新北市政府警察局,蘆洲分局,禁行大貨車,25.157011,121.415049,雙向
+5,新北市,八里區,八里區龍米路1段與關渡橋口,新北市政府警察局,蘆洲分局,跨越雙白線、跨越兩車道行駛,25.121325,121.455654," "
+7,新北市,八里區,八里區觀海大道28號旁,新北市政府警察局,蘆洲分局,禁行大貨車,25.1599131,121.4294863,南向北
+8,新北市,三芝區,三芝區淡金路一段與番社路口,新北市政府警察局,淡水分局,闖紅燈,25.258201,121.500933," "
+9,新北市,中和區,中和區中山路二段與員山路口(中山路二段583號附近),新北市政府警察局,中和分局,行駛人行道、違規停車,24.99912,121.49234," "
+10,新北市,板橋區,縣民大道三段公車站周邊,新北市政府警察局,板橋分局,違規(臨時)停車,25.01234,121.46789,西向東
+"""
+
+
+def test_164507_new_taipei_items_types_and_non_moving_rows():
+    from twsp_pipeline.parse import SOURCE_164507, parse_164507
+
+    cameras, unresolved, stats = parse_164507(CSV_164507, "2026-10-08T00:00")
+    assert not unresolved
+    # heavy-vehicle bans (rows 1, 4, 7) and parking-only (row 10) are skipped;
+    # a parking item alongside a moving one (row 9) keeps the row.
+    assert stats["164507_non_moving_skipped"] == 4
+    assert [c.type for c in cameras] == ["tech", "red_light", "tech"]
+    assert [c.bearing for c in cameras] == [None, None, None]  # blank `direct` = both directions
+    assert cameras[1].description == "三芝區淡金路一段與番社路口"  # regionname already leads the location
+    assert cameras[2].description.startswith("中和區中山路二段")
+    assert {c.city for c in cameras} == {"新北市"} and {c.source for c in cameras} == {SOURCE_164507}
+    assert all(c.speed_limit is None for c in cameras)
+
+
+CSV_ELAND_FIXED = """設備編號,型式,縣市,行政區,設置區域描述,設置地點(路口或路段),"取締項目(以""、""分隔)",座標緯度,座標經度,拍攝方向,速限,管轄單位,備註
+1,雷達,宜蘭縣,宜蘭市,,台9線78k中山路五段南下,測速,24.778509,121.759296,北向南、南向北,60,宜蘭分局,
+5,,宜蘭縣,宜蘭市,,191線與宜14線路口北上,闖紅燈,24.744093,121.781764,北向南、南向北,,宜蘭分局,
+"""
+
+CSV_ELAND_TECH = """設備編號,型式,縣市,行政區,科技執法種類,"取締項目(以""、""分隔)",設置區域描述,設置地點(路口或路段),座標緯度,座標經度,拍攝方向,速限,管轄單位,備註
+1,,宜蘭縣,宜蘭市,路口多功能執法,闖紅燈、不暫停讓行人、直行車占用轉彎車道、多車道左、右轉彎不先駛入內、外車道、不依標誌、標線、號誌指示行駛,,舊城南路、神農路、中山路口,24.754467,121.752087,西向東,,宜蘭分局,
+5,,宜蘭縣,宜蘭市,路口多功能執法,違規停車,,中山路一段370號前,24.731096,121.764908,西向東,,宜蘭分局,
+"""
+
+
+def test_yilan_portal_lists_use_the_county_standard_shape():
+    from twsp_pipeline.parse import SOURCE_ELAND_FIXED, SOURCE_ELAND_TECH, parse_eland_fixed, parse_eland_tech
+
+    fixed, unresolved, stats = parse_eland_fixed(CSV_ELAND_FIXED, "2026-10-08T00:00")
+    assert not unresolved
+    assert [(c.type, c.speed_limit, c.bearing) for c in fixed] == [("fixed", 60, None), ("red_light", None, None)]
+    assert fixed[0].description == "宜蘭市 台9線78k中山路五段南下" and fixed[0].city == "宜蘭縣"
+    assert {c.source for c in fixed} == {SOURCE_ELAND_FIXED}
+    assert stats["e-land:fixed_type:fixed"] == 1  # non-gov.tw sources keep their full key in the stats
+
+    tech, unresolved, stats = parse_eland_tech(CSV_ELAND_TECH, "2026-10-08T00:00")
+    assert not unresolved
+    assert [(c.type, c.bearing) for c in tech] == [("red_light", 90.0)]  # 西向東 = eastbound; the parking row is skipped
+    assert stats["e-land:tech_non_moving_skipped"] == 1
+    assert tech[0].source == SOURCE_ELAND_TECH

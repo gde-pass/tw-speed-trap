@@ -90,7 +90,11 @@ fun AboutScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                stringResource(R.string.about_attribution_body, stringResource(R.string.about_attribution_datasets)),
+                stringResource(
+                    R.string.about_attribution_body,
+                    stringResource(R.string.about_attribution_datasets),
+                    stringResource(R.string.about_attribution_portals),
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(6.dp))

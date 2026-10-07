@@ -12,6 +12,7 @@ import ssl
 import time
 import urllib.parse
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 
 import certifi
@@ -162,8 +163,24 @@ def split_resource_urls(field: str) -> list[str]:
     return [part.strip() for part in re.split(r"\s+", field or "") if part.strip().lower().startswith("http")]
 
 
-def resolve_csv_urls(dataset_id: int) -> list[str]:
-    """Ask the data.gov.tw v2 API for the current CSV resource URL(s)."""
+@dataclass(frozen=True)
+class DirectDataset:
+    """A dataset served only by a county portal that data.gov.tw does not
+    index (宜蘭's lists live on opendata.e-land.gov.tw alone). `key` names the
+    cache file and the build log line, `portal` the host the About screen
+    credits, `urls` the CSV resources (one download each)."""
+
+    key: str
+    portal: str
+    urls: tuple[str, ...]
+
+
+def resolve_csv_urls(dataset: "int | DirectDataset") -> list[str]:
+    """Ask the data.gov.tw v2 API for the current CSV resource URL(s); a
+    DirectDataset carries its own."""
+    if isinstance(dataset, DirectDataset):
+        return list(dataset.urls)
+    dataset_id = dataset
     data = _get_json(DATASET_API.format(dataset_id=dataset_id))
     if not data.get("success"):
         raise FetchError(f"dataset API returned success=false for {dataset_id}")
@@ -180,9 +197,9 @@ def resolve_csv_urls(dataset_id: int) -> list[str]:
     raise FetchError(f"no CSV resource found for dataset {dataset_id}")
 
 
-def resolve_csv_url(dataset_id: int) -> str:
+def resolve_csv_url(dataset: "int | DirectDataset") -> str:
     """First CSV resource URL of the dataset (see resolve_csv_urls)."""
-    return resolve_csv_urls(dataset_id)[0]
+    return resolve_csv_urls(dataset)[0]
 
 
 def download(url: str) -> bytes:

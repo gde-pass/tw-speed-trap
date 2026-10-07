@@ -90,6 +90,15 @@ def dataset_listed(dataset_id: int) -> bool:
         return False
 
 
+def direct_resource_answers(url: str) -> bool:
+    """County-portal CSVs we fetch by URL (baseline `direct`): a URL that stops
+    answering means the weekly build rides its snapshot for that source."""
+    try:
+        return bool(_get(url))
+    except FetchError:
+        return False
+
+
 def coordinate_header(dataset_id: int) -> bool | None:
     """True if the dataset's CSV header now names coordinates; None when the
     dataset could not be fetched."""
@@ -103,7 +112,7 @@ def coordinate_header(dataset_id: int) -> bool | None:
 
 def build_report(
     fresh: dict[str, str],
-    delisted: dict[int, str],
+    delisted: dict[int | str, str],
     gained_coords: dict[int, str],
 ) -> tuple[str, bool]:
     lines = ["# Dataset watch report", ""]
@@ -151,6 +160,9 @@ def main(argv: list[str] | None = None) -> int:
 
     fresh = new_datasets(matches, baseline)
     delisted = {i: title for i, title in baseline.get("used", {}).items() if not dataset_listed(i)}
+    for key, url in (baseline.get("direct") or {}).items():
+        if not direct_resource_answers(url):
+            delisted[key] = url
     gained_coords = {
         i: title
         for i, title in baseline.get("waiting_for_coordinates", {}).items()

@@ -55,6 +55,22 @@ double alerts for one device geocoded twice (e.g. N3 313.7 at 335 m,
 N4 4.4 at 613 m). Still worth reporting upstream — suppression loses the
 device entirely when both sources share the wrong geocode.
 
+Off-freeway rows get the same treatment since v1.5.6 (`districts.py`,
+MOI township polygons): a row more than 1 km outside the county it is
+filed under or 2 km outside the township its description names is
+dropped and listed in the build log. The 2026-10 run caught 11 — 7320's
+霧峰區中正路569-9號前, 大里區國光路一段72號前 / 二段505號前, 大里區環河路一段188號
+and 烏日區環中路八段599號前 all placed ~28 km west in 彰化 (福興/鹿港),
+臺灣大道八段與港埠路口 and two 屏東 rows (營區路, 187乙線17.33K) in the sea,
+170673's 潭子區中山路與環中東路口 in 太平, 澎湖 156415's 白沙鄉 203線 20.77k
+7 km offshore, and 宜蘭's 台2線133k+769m 1 km offshore. Six more pairs where
+the same camera sits at two places >100 m apart in 7320 and 83881 are
+resolved by `data/overrides.yaml` with reverse-geocoding evidence (the
+dropped copy is on another road); 24 same-description pairs 100–2800 m
+apart on the *same* road remain undecidable from data alone — the
+gantry-marking ride test below is the way to settle them. All worth
+reporting to 警政署 / 臺中市警察局.
+
 ## CI: bot data commits skip CI
 
 The weekly data commit is pushed with GITHUB_TOKEN, so GitHub suppresses

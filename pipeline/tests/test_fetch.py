@@ -106,3 +106,11 @@ def test_split_resource_urls_handles_crlf_joined_fields():
     ]
     assert fetch.split_resource_urls("https://a.gov.tw/one.csv") == ["https://a.gov.tw/one.csv"]
     assert fetch.split_resource_urls("") == []
+
+
+def test_direct_dataset_resolves_to_its_own_urls_without_the_portal_api():
+    from twsp_pipeline.fetch import DirectDataset, resolve_csv_url, resolve_csv_urls
+
+    dataset = DirectDataset("e-land:fixed", "opendata.e-land.gov.tw", ("https://example.test/a.csv", "https://example.test/b.csv"))
+    assert resolve_csv_urls(dataset) == ["https://example.test/a.csv", "https://example.test/b.csv"]
+    assert resolve_csv_url(dataset) == "https://example.test/a.csv"

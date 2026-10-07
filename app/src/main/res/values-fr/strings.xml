@@ -107,7 +107,7 @@
     <string name="about_title">À propos</string>
     <string name="about_version">Version de l’application %1$s</string>
     <string name="about_attribution_title">Attribution des données</string>
-    <string name="about_attribution_body">Les positions des radars proviennent des données ouvertes du gouvernement taïwanais (data.gov.tw), publiées sous la licence Open Government Data License v1.0 (政府資料開放授權條款—第1版). Identifiants des jeux de données : %1$s.</string>
+    <string name="about_attribution_body">Les positions des radars proviennent des données ouvertes du gouvernement taïwanais (data.gov.tw) et des portails open data des comtés, publiées sous la licence Open Government Data License v1.0 (政府資料開放授權條款—第1版). Identifiants des jeux de données : %1$s. Portails : %2$s.</string>
     <string name="about_data_license">Voir la licence des données</string>
     <string name="about_code_title">Code et carte</string>
     <string name="about_license">Le code de l’application est open source sous licence MIT.</string>
