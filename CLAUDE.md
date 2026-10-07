@@ -21,7 +21,9 @@
 - detekt `ComplexCondition` fires at 4 boolean operands — keep conditions ≤3, hoist a named local
 - After post-commit lint fixes, check `git status` is clean before pushing — path-scoped commits have missed follow-up edits (cost one red CI run)
 - Also hit this session: `LongMethod` at 60 lines (extract a `publish(...)`-style helper), `CyclomaticComplexMethod` at 15 (split a long Composable into section Composables), `MaxLineLength` applies to test sources too (break long URL literals with `+`)
+- detekt `LoopWithTooManyJumpStatements` fires on a loop with two `continue`s, and the guard chain that produced them also trips `CyclomaticComplexMethod`: move the per-item guards into a `fun candidateDistance(...): Double?` helper and keep the loop as `val d = helper(...) ?: continue` (checkPreAlerts went 18 → under the threshold this way)
 - Editing Kotlin from python scripts: `ktlintFormat` rewraps multi-line calls, so an `old` string written from memory of your own previous edit often no longer matches — print the current region first; a failed `assert` mid-script leaves that script's files untouched (writes are at the end), so just fix and re-run the whole script
+- Adding an `AlertEvent` subtype: only `AlertEngine` and `DetectionService.announce` switch over events, and that `when` is a statement, so a new subtype compiles silently unannounced — add its branch and strings (en + fr) in the same change. The tracker tests assert exact event lists through `replay()`/`chainedReplay()`; a new event that precedes the old ones belongs filtered out there (`withoutPreAlerts()`) with its own tests, not spliced into every expectation
 - Appending tests to AlertEngineTest: its last member is `private val degPerMeterLon`; append *before* it or you get a duplicate declaration (happened twice)
 
 ## Release & data protocol
@@ -37,6 +39,7 @@
 - Run `gh workflow run` on its own with a short timeout (it hung >2 min chained after a push), then poll with a background `until`-loop on `gh run view --json status`; `gh run watch` blew a 10-min timeout once
 - Polling two runs in zsh: `ids=($(gh run list --json databaseId,name,headBranch --jq … | awk '$3=="vX.Y.Z" || ($2=="CI" && $3=="main") {print $1}'))` — a plain `ids=$(…)` is one unsplit word and every `gh run view $ids` 404s. Tag runs show `headBranch == "vX.Y.Z"`; CI runs show `main`
 - Three releases in one session (v1.5.2 → v1.5.4) with a data-update dispatch after each push worked without a single race: the only rule is never to push main between `gh workflow run data-update.yml` and its green run, then `git pull --ff-only` before the next commit
+- A code-only release (v1.5.5) skips the data-update dispatch entirely: commit → `pull --rebase` → push → tag → push tag, poll CI + Release, add notes — about 7 minutes end to end
 - A data-only batch still needs an app release when `DATASETS` grows: the About screen's attribution string changes (license), and the bundled db should match — bump the patch version, same chain as a fix release (v1.5.3 was that)
 - Cadence that worked: one release per fix batch, version bump in the same commit as the fix, `git pull --rebase -X theirs` → push → tag → push tag in one chained command, then `gh release edit vX.Y.Z --title vX.Y.Z --notes-file -` with a heredoc once the Release run is green (≈6 min after the tag)
 - `gh secret set NAME --repo … < file` works from here; repository secrets are available to `schedule` runs (environment secrets would need `environment:` on the job)
