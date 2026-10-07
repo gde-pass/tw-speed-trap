@@ -26,6 +26,11 @@ they change over time):
   Taoyuan speed and red-light cameras
 - [178168](https://data.gov.tw/dataset/178168) 桃園市科技執法設備地點 —
   Taoyuan tech enforcement
+- [53645](https://data.gov.tw/dataset/53645) 臺南市固定式交通違規照相設備設置地點 —
+  Tainan fixed and junction cameras; the city publishes text locations only,
+  so rows are joined to the curated coordinates in `data/geocodes/53645.yaml`
+  (OSM junction geocoding + national-list twins; a new upstream row is
+  reported as "geocode missing" until it is curated)
 - [83881](https://data.gov.tw/dataset/83881) 臺中市科學儀器執法設備取締地點(固定式) —
   Taichung police fixed cameras (speed + red-light, with bearing and limit)
 - [170673](https://data.gov.tw/dataset/170673) 臺中市科技執法取締地點 —
@@ -84,6 +89,18 @@ moving rider.
 
 Everything dropped is counted in the build report and written to
 `unresolved.csv` — never silently.
+
+### Geocoding a text-only list
+
+`data/geocodes/<id>.yaml` holds hand-verified coordinates for a dataset
+that names its locations but gives no coordinates (臺南 53645: 「中華路與中
+央路口」). The table was produced offline from the Geofabrik Taiwan OSM
+extract with pyosmium: index every named `highway` way (provincial 台N refs
+come from the `TW:provincial` route relations, not the ways), take the
+shared node of the two named roads, and keep the node cluster inside the
+row's 行政區. Rows that already exist in the national list reuse its
+coordinate so they dedupe onto it. The table states the method per entry;
+the build reports every row it cannot join.
 
 ## Run
 

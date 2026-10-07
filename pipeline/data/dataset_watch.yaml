@@ -43,6 +43,7 @@ used:
   178734: 臺東縣警察局取締違規照相設備暨科技執法偵測設置地點一覽表115.9.30
   38357: 南投縣政府警察局固定式自動測速照相桿
   100855: 國道公路警察局交流道區重點違規錄影地點
+  53645: 臺南市固定式交通違規照相設備設置地點  # text locations only — coordinates come from the curated table pipeline/data/geocodes/53645.yaml (OSM junction geocoding + 7320 twins); a new upstream row shows up as "geocode missing" in the build report (2026-10)
   164507: 路口安全自動偵測系統設置地點  # 新北市 intersection tech enforcement (闖紅燈/不停讓行人/…), 110 rows with coordinates; surfaced by the title-search terms 偵測/設置地點 (2026-10)
 
 # County portals that data.gov.tw does not index: fetched by URL (cli.DIRECT
@@ -57,9 +58,8 @@ direct:
   # coordinate per direction — recorded as sections.yaml candidates, not ingested.
 
 waiting_for_coordinates:
-  53645: 臺南市固定式交通違規照相設備設置地點 — 194 rows, km markers and road names only (2026-10)
   170672: 臺中市科學儀器執法設備取締地點(移動式) — 386 mobile spots, 經度/緯度 columns present but empty (2026-10)
-  139129: 臺南市智慧管理科技執法設備設置地點 — descriptions only, no coordinate columns (2026-08)
+  139129: 臺南市智慧管理科技執法設備設置地點 — descriptions only, no coordinate columns; same 191 rows as 53645 with 「X往Y」 directions, so 53645 (via its geocode table) covers it (2026-08, re-checked 2026-10)
   161852: 嘉義市固定式科技執法自動偵測系統設置地點 — descriptions only, no coordinate columns (2026-09)
 
 seen:

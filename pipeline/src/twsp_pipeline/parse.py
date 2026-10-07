@@ -8,6 +8,9 @@ import csv
 import io
 import re
 from collections import Counter
+from pathlib import Path
+
+import yaml
 
 from .model import Camera, Unresolved
 from .normalize import make_id, parse_bearing, parse_limit
@@ -45,6 +48,7 @@ SOURCE_178734 = "gov.tw:178734"
 SOURCE_38357 = "gov.tw:38357"
 SOURCE_100855 = "gov.tw:100855"
 SOURCE_164507 = "gov.tw:164507"
+SOURCE_53645 = "gov.tw:53645"
 # County-portal sources (fetch.DirectDataset): not data.gov.tw ids.
 SOURCE_ELAND_FIXED = "e-land:fixed"
 SOURCE_ELAND_TECH = "e-land:tech"
@@ -76,7 +80,9 @@ def _is_section(text: str) -> bool:
 # 停車) and vehicle-class bans (禁行大貨車/聯結車, 限制車種). A row whose every
 # item is one of these is skipped — the same call the baseline made when it
 # declined 高雄's 限制車種 and 違規停車 datasets — and counted in the stats.
-_NON_MOVING = re.compile(r"停車|禁行(?:大貨車|聯結車|大型車|砂石車|貨車)|限制車種|車種(?:管制|限制)")
+# 停車 alone would also catch 「行經閃紅號誌路口未停車再開」 (failing to stop —
+# a moving violation), so parking needs its 違規/臨時 qualifier.
+_NON_MOVING = re.compile(r"違規.{0,8}停車|臨時停車|禁行(?:大貨車|聯結車|大型車|砂石車|貨車)|限制車種|車種(?:管制|限制)")
 
 
 def _only_non_moving(items: str) -> bool:
@@ -974,3 +980,87 @@ def parse_eland_tech(text: str, today: str) -> tuple[list[Camera], list[Unresolv
     """宜蘭 intersection enforcement (…設置地點(科技執法), county portal): same
     shape plus 科技執法種類; parking-only rows are skipped."""
     return _parse_county_standard(text, today, SOURCE_ELAND_TECH, _SUFFIXED_PLACE_COLS, _SUFFIXED_ITEMS_COLS)
+
+
+GEOCODES_53645 = Path(__file__).resolve().parents[2] / "data" / "geocodes" / "53645.yaml"
+_ITEMS_BRACKET = re.compile(r"【(.*?)】")
+
+
+def load_geocodes(path: Path) -> dict[str, tuple[str, str]]:
+    """place text → (lat, lon) strings from a curated geocode table (see
+    data/geocodes/53645.yaml for the schema and the provenance rules)."""
+    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    table: dict[str, tuple[str, str]] = {}
+    for entry in payload.get("geocodes") or []:
+        table[_place_key(str(entry["place"]))] = (str(entry["lat"]), str(entry["lon"]))
+    return table
+
+
+def _place_key(place: str) -> str:
+    return re.sub(r"\s+", "", place)
+
+
+def parse_53645(
+    text: str, today: str, geocodes: dict[str, tuple[str, str]] | None = None
+) -> tuple[list[Camera], list[Unresolved], Counter]:
+    """臺南 fixed and tech cameras (臺南市固定式交通違規照相設備設置地點): the
+    city publishes text locations only, so coordinates come from the curated
+    geocode table keyed on 設置位置. A row without an entry is reported as
+    unresolved ("geocode missing") — a new upstream camera is never silently
+    dropped, it shows up in the build report for curation. Items ride inside
+    【…】 in the location text; 拍攝行向 「北向」 is northbound traffic."""
+    if geocodes is None:
+        geocodes = load_geocodes(GEOCODES_53645)
+    reader = csv.DictReader(io.StringIO(_strip_bom(text)))
+    _require_columns(reader.fieldnames, {"行政區", "設置位置", "拍攝行向", "速限"}, SOURCE_53645)
+    cameras: list[Camera] = []
+    unresolved: list[Unresolved] = []
+    stats: Counter = Counter()
+    for row in reader:
+        place = (row.get("設置位置") or "").strip()
+        items = "、".join(_ITEMS_BRACKET.findall(place))
+        if _is_section(place):
+            stats["53645_sections_excluded"] += 1
+            continue
+        # 自動辨識違規停車 systems describe their kerb span in a first bracket,
+        # so the item test alone would not recognise them as parking-only.
+        if _only_non_moving(items) or "自動辨識違規停車" in place:
+            stats["53645_non_moving_skipped"] += 1
+            continue
+        coords = geocodes.get(_place_key(place))
+        if coords is None:
+            stats["53645_geocode_missing"] += 1
+            unresolved.append(Unresolved(SOURCE_53645, "geocode missing (data/geocodes/53645.yaml)", dict(row)))
+            continue
+        if "超速" in items or "測速" in items or not items:
+            cam_type = "fixed"  # the plain rows are the city's speed/red-light poles that 7320 lists as speed points
+        elif "闖紅燈" in items:
+            cam_type = "red_light"
+        else:
+            cam_type = "tech"
+        description = _ITEMS_BRACKET.sub("", place).strip()
+        area = (row.get("行政區") or "").strip()
+        if area and area not in description:
+            description = f"{area} {description}".strip()
+        bearing = parse_bearing(row.get("拍攝行向"))
+        try:
+            lat, lon = normalize_coords(*coords)
+        except CoordinateError as e:
+            unresolved.append(Unresolved(SOURCE_53645, str(e), dict(row)))
+            continue
+        stats[f"53645_type:{cam_type}"] += 1
+        cameras.append(
+            Camera(
+                id=make_id(SOURCE_53645, lat, lon, bearing),
+                lat=lat,
+                lon=lon,
+                type=cam_type,
+                speed_limit=parse_limit(row.get("速限")),
+                bearing=bearing,
+                city="臺南市",
+                description=description,
+                source=SOURCE_53645,
+                last_seen=today,
+            )
+        )
+    return cameras, unresolved, stats

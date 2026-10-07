@@ -597,3 +597,35 @@ def test_yilan_portal_lists_use_the_county_standard_shape():
     assert [(c.type, c.bearing) for c in tech] == [("red_light", 90.0)]  # 西向東 = eastbound; the parking row is skipped
     assert stats["e-land:tech_non_moving_skipped"] == 1
     assert tech[0].source == SOURCE_ELAND_TECH
+
+
+CSV_53645 = """編號,轄區分局,地址-行政區域代碼,行政區,設置位置,拍攝行向,速限
+4,新營分局,67000010,新營區,長榮路一段與東泰路口,西向,60
+119,第五分局,67000330,東區,北門路段(火車站前圓環至青年路)自動辨識違規停車及不依標線行駛科技執法系統【違規停車、違規臨時停車、違規占用機(慢)車優先道臨時停車及行駛等】,雙向,50
+129,永康分局,67000190,永康區,中華路與中央路口【闖紅燈、紅燈右轉、紅燈越線、超速、未依標誌標線行駛等】,多向,50
+154,第二分局,67000310,中西區,中成路與慈音街路口【行經閃紅號誌路口未停車再開等】,多向,50
+167,善化分局,67000110,新市區,樹谷大道與紫楝路(王甲路)口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛等】,雙向,快車道60機慢車道40
+126,永康分局,67000310,永康區,中華路與中華一路口周邊路段(近兵仔市場)【中華路東側自門牌96號至204號、中華路西側自門牌145號至213號】自動辨識違規停車及不依標線行駛科技執法系統【違規停車、違規臨時停車、違規占用機(慢)車優先道臨時停車及行駛等】,雙向,50
+"""
+
+
+def test_53645_tainan_rows_resolve_through_the_curated_geocode_table():
+    from twsp_pipeline.parse import SOURCE_53645, parse_53645
+
+    table = {
+        "長榮路一段與東泰路口": ("23.3094", "120.3060"),
+        "中華路與中央路口【闖紅燈、紅燈右轉、紅燈越線、超速、未依標誌標線行駛等】": ("23.0266", "120.2492"),
+        "中成路與慈音街路口【行經閃紅號誌路口未停車再開等】": ("22.9896", "120.1984"),
+    }
+    cameras, unresolved, stats = parse_53645(CSV_53645, "2026-10-08T00:00", geocodes=table)
+    # rows 119 and 126 enforce parking only (126 hides it behind a kerb-span bracket) → skipped;
+    # row 167 has no geocode → unresolved, not dropped silently
+    assert stats["53645_non_moving_skipped"] == 2
+    assert stats["53645_geocode_missing"] == 1 and unresolved[0].reason.startswith("geocode missing")
+    assert [(c.type, c.speed_limit, c.bearing) for c in cameras] == [
+        ("fixed", 60, 270.0),  # plain row, 西向 = westbound
+        ("fixed", 50, None),  # 超速 among the items wins over 闖紅燈; 多向 = both
+        ("tech", 50, None),  # 未停車再開 is a moving violation, not parking
+    ]
+    assert cameras[1].description == "永康區 中華路與中央路口"  # items bracket stripped, district prefixed
+    assert {c.city for c in cameras} == {"臺南市"} and {c.source for c in cameras} == {SOURCE_53645}

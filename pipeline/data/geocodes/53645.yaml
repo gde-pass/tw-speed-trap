@@ -1,0 +1,928 @@
+# Curated coordinates for 臺南市固定式交通違規照相設備設置地點 (data.gov.tw 53645).
+# The city publishes text locations only (「中華路與中央路口【闖紅燈、超速…】」),
+# so parse_53645 joins each row to this table on the exact 設置位置 text and
+# reports a row without an entry as "geocode missing" — a new camera upstream
+# is never dropped silently, it appears in the build report for curation.
+#
+# method:
+#   osm-junction  shared node of the two named roads in OpenStreetMap (Geofabrik
+#                 Taiwan extract of 2026-10-07; provincial 台N refs via the
+#                 TW:provincial route relations), the node cluster inside the
+#                 row's 行政區 preferred; `note` gives the district the point
+#                 fell in and the node count. Border junctions legitimately
+#                 land in the neighbouring district.
+#   7320-twin     the same camera appears in the national list 7320 (matched on
+#                 road names / km markers); its coordinate is reused so the row
+#                 dedupes onto the national one and only the type/limit differ.
+#   manual        placed by hand, reason in `note`.
+#
+# Rows deliberately absent: parking-only systems (skipped by the parser) and
+# three junctions OSM cannot resolve yet — 北安路4段548巷-近長和街口 (安南),
+# 中華北路與觀海橋路口 (北區), 中正路66巷與建國路78巷口 (善化) — which the build
+# lists as unresolved until someone pins them on the road.
+geocodes:
+  - place: "臺1線290.3公里與東山路口"
+    lat: 23.308907
+    lon: 120.325730
+    method: 7320-twin
+    note: "7320 twin: 臺1線290.3公里與東山路口"
+  - place: "長榮路、三興街口172線20.05公里"
+    lat: 23.319435
+    lon: 120.300354
+    method: 7320-twin
+    note: "7320 twin: 長榮路與三興街口172線20.05公里"
+  - place: "南314線1公里"
+    lat: 23.309875
+    lon: 120.335900
+    method: 7320-twin
+    note: "7320 twin: 南314線1公里"
+  - place: "長榮路一段與東泰路口"
+    lat: 23.320007
+    lon: 120.326413
+    method: osm-junction
+    note: "新營區; in 新營區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "飯店里臺19線110.3公里"
+    lat: 23.263838
+    lon: 120.209780
+    method: 7320-twin
+    note: "7320 twin: 飯店里臺19線110.3公里"
+  - place: "歡雅里臺19線105.6公里"
+    lat: 23.292790
+    lon: 120.241684
+    method: 7320-twin
+    note: "7320 twin: 歡雅里臺19線105.6公里"
+  - place: "三和里田寮往臺19線路口"
+    lat: 23.276768
+    lon: 120.229410
+    method: 7320-twin
+    note: "7320 twin: 三和里田寮往臺19線路口"
+  - place: "臺1線294.1公里"
+    lat: 23.276260
+    lon: 120.325320
+    method: 7320-twin
+    note: "7320 twin: 臺1線294.1公里"
+  - place: "長榮路四段近2.8公里"
+    lat: 23.282194
+    lon: 120.293900
+    method: 7320-twin
+    note: "7320 twin: 長榮路四段近2.8公里處"
+  - place: "臺1線281.9公里處後壁陸橋北端"
+    lat: 23.374134
+    lon: 120.364890
+    method: 7320-twin
+    note: "7320 twin: 臺1線281.9公里處後壁陸橋北端"
+  - place: "臺1線279.9公里與南91線路口"
+    lat: 23.388468
+    lon: 120.375340
+    method: 7320-twin
+    note: "7320 twin: 臺1線279.9公里與南91線路口"
+  - place: "165線18.82公里"
+    lat: 23.310371
+    lon: 120.400185
+    method: 7320-twin
+    note: "7320 twin: 165線18.82公里"
+  - place: "市道172線與木屐寮路口"
+    lat: 23.350496
+    lon: 120.452156
+    method: 7320-twin
+    note: "7320 twin: 市道172線與木屐寮路口"
+  - place: "市道172線與南76線路口"
+    lat: 23.330960
+    lon: 120.353450
+    method: 7320-twin
+    note: "7320 twin: 市道172線與南76線路口"
+  - place: "臺1線302公里"
+    lat: 23.214054
+    lon: 120.307320
+    method: 7320-twin
+    note: "7320 twin: 臺1線302公里"
+  - place: "臺19甲17.2公里與新生南路路口"
+    lat: 23.176693
+    lon: 120.254030
+    method: 7320-twin
+    note: "7320 twin: 臺19甲17.2公里與新生南路路口"
+  - place: "176線16.9公里麻豆口路口"
+    lat: 23.176996
+    lon: 120.219990
+    method: 7320-twin
+    note: "7320 twin: 176線16.9公里麻豆口路口"
+  - place: "臺19甲線與中正、文昌路口"
+    lat: 23.189913
+    lon: 120.253610
+    method: 7320-twin
+    note: "7320 twin: 臺19甲線與中正、文昌路口"
+  - place: "新生南路與中山路口"
+    lat: 23.184969
+    lon: 120.241070
+    method: 7320-twin
+    note: "7320 twin: 新生南路與中山路口"
+  - place: "市道173線紀安國小前"
+    lat: 23.151213
+    lon: 120.238106
+    method: 7320-twin
+    note: "7320 twin: 市道173線紀安國小前"
+  - place: "臺84線快速公路16.3公里處"
+    lat: 23.211996
+    lon: 120.251076
+    method: 7320-twin
+    note: "7320 twin: 臺84線快速公路16.3公里處"
+  - place: "臺1線297.3公里與174線路口"
+    lat: 23.253683
+    lon: 120.312450
+    method: 7320-twin
+    note: "7320 twin: 臺1線297.3公里與174線路口"
+  - place: "臺1線298.8公里與174線路口"
+    lat: 23.240040
+    lon: 120.315610
+    method: 7320-twin
+    note: "7320 twin: 臺1線298.8公里與174線路口"
+  - place: "臺17線153.95公里處"
+    lat: 23.175344
+    lon: 120.133705
+    method: 7320-twin
+    note: "7320 twin: 臺17線153.95公里處"
+  - place: "臺17線152.6公里大潭寮路口"
+    lat: 23.189188
+    lon: 120.124985
+    method: 7320-twin
+    note: "7320 twin: 臺17線152.6公里大潭寮路口"
+  - place: "臺17線162.05公里與南38線路口"
+    lat: 23.104435
+    lon: 120.131676
+    method: 7320-twin
+    note: "7320 twin: 臺17線162.05公里與南38線路口"
+  - place: "臺17線155.6公里篤加國小前路口"
+    lat: 23.159895
+    lon: 120.134610
+    method: 7320-twin
+    note: "7320 twin: 臺17線155.6公里篤加國小前路口"
+  - place: "臺61線快速公路302.3公里處"
+    lat: 23.119587
+    lon: 120.087410
+    method: 7320-twin
+    note: "7320 twin: 臺61線快速公路302.3公里處"
+  - place: "臺19線125.8公里與南45線往後營路口"
+    lat: 23.142836
+    lon: 120.192510
+    method: 7320-twin
+    note: "7320 twin: 臺19線125.8公里與南45線往後營路口"
+  - place: "佳青路一段（近北頭洋公車站附近）"
+    lat: 23.172243
+    lon: 120.162590
+    method: 7320-twin
+    note: "7320 twin: 佳青路一段（近北頭洋公車站附近）"
+  - place: "臺19線117.5公里大安里大灣路口"
+    lat: 23.211151
+    lon: 120.185670
+    method: 7320-twin
+    note: "7320 twin: 臺19線117.5公里大安里大灣路口"
+  - place: "臺84線快速公路10.2公里處"
+    lat: 23.231804
+    lon: 120.217780
+    method: 7320-twin
+    note: "7320 twin: 臺84線快速公路10.2公里處"
+  - place: "臺61線281.9公里"
+    lat: 23.294575
+    lon: 120.129720
+    method: 7320-twin
+    note: "7320 twin: 臺61線281.9公里"
+  - place: "臺1線310.6公里處"
+    lat: 23.150946
+    lon: 120.334440
+    method: 7320-twin
+    note: "7320 twin: 臺1線310.6公里處"
+  - place: "臺19線132.7公里中崙段"
+    lat: 23.084492
+    lon: 120.210495
+    method: 7320-twin
+    note: "7320 twin: 臺19線132.7公里中崙段"
+  - place: "178線7.9公里與134線路口"
+    lat: 23.094667
+    lon: 120.229240
+    method: 7320-twin
+    note: "7320 twin: 178線7.9公里與南134線路口"
+  - place: "嘉榮路512號前"
+    lat: 23.079973
+    lon: 120.229510
+    method: 7320-twin
+    note: "7320 twin: 嘉榮路512號前"
+  - place: "臺84線37.2公里處走馬瀨隧道口"
+    lat: 23.142551
+    lon: 120.425450
+    method: 7320-twin
+    note: "7320 twin: 臺84線37.2公里處走馬瀨隧道口"
+  - place: "臺1線317.7公里"
+    lat: 23.093860
+    lon: 120.310776
+    method: 7320-twin
+    note: "7320 twin: 臺1線317.7公里"
+  - place: "臺19甲線28公里處"
+    lat: 23.099846
+    lon: 120.294930
+    method: 7320-twin
+    note: "7320 twin: 臺19甲線28公里處"
+  - place: "社內里大洲五號橋T字路口"
+    lat: 23.077768
+    lon: 120.274880
+    method: 7320-twin
+    note: "7320 twin: 社內里大洲五號橋T字路口"
+  - place: "臺20線22.3公里"
+    lat: 23.067501
+    lon: 120.380120
+    method: 7320-twin
+    note: "7320 twin: 臺20線22.3公里"
+  - place: "臺20乙線0.7公里處(近睦光橋)"
+    lat: 23.050117
+    lon: 120.420860
+    method: 7320-twin
+    note: "7320 twin: 臺20乙線0.7公里處(近睦光橋)"
+  - place: "臺19甲線33.5公里"
+    lat: 23.055922
+    lon: 120.298650
+    method: 7320-twin
+    note: "7320 twin: 臺19甲線33.5公里"
+  - place: "臺20線15.9公里國8道路口"
+    lat: 23.061539
+    lon: 120.332010
+    method: 7320-twin
+    note: "7320 twin: 臺20線15.9公里國8道路口"
+  - place: "臺19甲線與信義路路口"
+    lat: 23.038275
+    lon: 120.321380
+    method: 7320-twin
+    note: "7320 twin: 臺19甲線與信義路路口"
+  - place: "二仁路台1線341.85公里"
+    lat: 22.939863
+    lon: 120.221200
+    method: 7320-twin
+    note: "7320 twin: 二仁路台1線341.85K"
+  - place: "臺1線342.7公里台86線匝道路口"
+    lat: 22.931923
+    lon: 120.220930
+    method: 7320-twin
+    note: "7320 twin: 臺1線342.7公里臺86線匝道路口"
+  - place: "臺1線344.15公里與二行一路路口"
+    lat: 22.920004
+    lon: 120.225494
+    method: 7320-twin
+    note: "7320 twin: 臺1線344.15公里與二行一路路口"
+  - place: "快速道路86線西向3.9K處"
+    lat: 22.927332
+    lon: 120.211650
+    method: 7320-twin
+    note: "7320 twin: 快速道路86線西向3.9K處"
+  - place: "文德路與中山路口"
+    lat: 22.972763
+    lon: 120.248210
+    method: 7320-twin
+    note: "7320 twin: 文德路與中山路口"
+  - place: "機場路1050號前"
+    lat: 22.949238
+    lon: 120.216690
+    method: 7320-twin
+    note: "7320 twin: 機場路1050號前"
+  - place: "臺39線2.6公里處"
+    lat: 23.011648
+    lon: 120.287280
+    method: 7320-twin
+    note: "7320 twin: 臺39線2.6公里處"
+  - place: "臺39線10公里"
+    lat: 22.947570
+    lon: 120.275260
+    method: 7320-twin
+    note: "7320 twin: 臺39線10公里"
+  - place: "182線12.1公里忠孝南北路口"
+    lat: 22.965597
+    lon: 120.303055
+    method: 7320-twin
+    note: "7320 twin: 182線12.1公里忠孝南北路口"
+  - place: "文華路虎山橋下橋處"
+    lat: 22.942245
+    lon: 120.230774
+    method: 7320-twin
+    note: "7320 twin: 文華路虎山橋下橋處"
+  - place: "臺19甲線41公里"
+    lat: 22.988716
+    lon: 120.309670
+    method: 7320-twin
+    note: "7320 twin: 臺19甲線41公里"
+  - place: "臺86線17.85公里"
+    lat: 22.971280
+    lon: 120.313240
+    method: 7320-twin
+    note: "7320 twin: 臺86線17.85公里"
+  - place: "市道182線28.5公里"
+    lat: 22.929552
+    lon: 120.420660
+    method: 7320-twin
+    note: "7320 twin: 182市道28.5公里"
+  - place: "市道182線中正路與南屏路口"
+    lat: 22.967940
+    lon: 120.357170
+    method: 7320-twin
+    note: "7320 twin: 市道182線中正路與南屏路口"
+  - place: "市道182線27.68K處"
+    lat: 22.936176
+    lon: 120.421980
+    method: 7320-twin
+    note: "7320 twin: 市道182線27.68K處"
+  - place: "市道182線28.23K處"
+    lat: 22.932732
+    lon: 120.420810
+    method: 7320-twin
+    note: "7320 twin: 市道182線28.23K處"
+  - place: "臺3線369公里"
+    lat: 23.155445
+    lon: 120.488530
+    method: 7320-twin
+    note: "7320 twin: 臺3線369公里"
+  - place: "臺3線378.4公里"
+    lat: 23.086584
+    lon: 120.486984
+    method: 7320-twin
+    note: "7320 twin: 臺3線378.4公里"
+  - place: "臺3線383.5公里"
+    lat: 23.049162
+    lon: 120.485170
+    method: 7320-twin
+    note: "7320 twin: 臺3線383.5公里"
+  - place: "臺3線388公里處"
+    lat: 23.013083
+    lon: 120.470220
+    method: 7320-twin
+    note: "7320 twin: 臺3線388K處"
+  - place: "玉山里臺20線46.95公里處"
+    lat: 23.084084
+    lon: 120.524330
+    method: 7320-twin
+    note: "7320 twin: 玉山里臺20線46.95公里處"
+  - place: "臺84線40.38公里"
+    lat: 23.124760
+    lon: 120.450110
+    method: 7320-twin
+    note: "7320 twin: 臺84線40.38公里"
+  - place: "臺84線40.8公里"
+    lat: 23.122286
+    lon: 120.453540
+    method: 7320-twin
+    note: "7320 twin: 臺84線40.8公里"
+  - place: "中華路與中華二路口"
+    lat: 23.008518
+    lon: 120.233830
+    method: 7320-twin
+    note: "7320 twin: 中華路與中華二路口"
+  - place: "復興路與復興路26巷口"
+    lat: 22.998642
+    lon: 120.249560
+    method: 7320-twin
+    note: "7320 twin: 復興路與復興路26巷口"
+  - place: "永大路與中山北路口"
+    lat: 23.027417
+    lon: 120.260628
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "近高速一街二段與永二街245巷26弄路口"
+    lat: 23.015137
+    lon: 120.250570
+    method: 7320-twin
+    note: "7320 twin: 近高速一街二段與永二街245巷26弄路口"
+  - place: "河堤道路與洲工街175巷口"
+    lat: 23.038078
+    lon: 120.225570
+    method: 7320-twin
+    note: "7320 twin: 河堤道路與洲工街175巷口"
+  - place: "林森路後甲國中-近東和路口"
+    lat: 22.998150
+    lon: 120.224420
+    method: 7320-twin
+    note: "7320 twin: 林森路後甲國中前-近東和路口"
+  - place: "中華東路-平實五街路口"
+    lat: 22.994543
+    lon: 120.234240
+    method: 7320-twin
+    note: "7320 twin: 中華東路-平實五街路口"
+  - place: "中華東路-凱旋路口"
+    lat: 22.992640
+    lon: 120.233940
+    method: 7320-twin
+    note: "7320 twin: 中華東路-凱旋路口"
+  - place: "林森路-大同路口"
+    lat: 22.980795
+    lon: 120.212296
+    method: 7320-twin
+    note: "7320 twin: 林森路-大同路口"
+  - place: "崇善路-德東街口"
+    lat: 22.962046
+    lon: 120.236160
+    method: 7320-twin
+    note: "7320 twin: 崇善路-德東街口"
+  - place: "中華東路與東門路口"
+    lat: 22.980800
+    lon: 120.229164
+    method: 7320-twin
+    note: "7320 twin: 中華東路與東門路口"
+  - place: "榮譽街與榮譽街25巷口(近大同國小前)"
+    lat: 22.973982
+    lon: 120.215650
+    method: 7320-twin
+    note: "7320 twin: 榮譽街與榮譽街25巷口(近大同國小前)"
+  - place: "西門路與民族路口"
+    lat: 22.997572
+    lon: 120.200134
+    method: 7320-twin
+    note: "7320 twin: 西門路與民族路口"
+  - place: "安明路-近大港觀海橋"
+    lat: 23.017673
+    lon: 120.179030
+    method: 7320-twin
+    note: "7320 twin: 安明路-近大港觀海橋"
+  - place: "安明路近北汕尾路口"
+    lat: 23.052057
+    lon: 120.142685
+    method: 7320-twin
+    note: "7320 twin: 安明路近北汕尾路口"
+  - place: "北安路3段396巷前"
+    lat: 23.046125
+    lon: 120.208040
+    method: 7320-twin
+    note: "7320 twin: 北安路3段396巷前"
+  - place: "安吉路3段近安順庄大道"
+    lat: 23.077350
+    lon: 120.193634
+    method: 7320-twin
+    note: "7320 twin: 安吉路3段近安順庄大道"
+  - place: "安吉路一段近本原街口"
+    lat: 23.052488
+    lon: 120.189610
+    method: 7320-twin
+    note: "7320 twin: 安吉路一段近本原街口"
+  - place: "安吉路-安中路口"
+    lat: 23.045890
+    lon: 120.188400
+    method: 7320-twin
+    note: "7320 twin: 安吉路-安中路口"
+  - place: "安明路4段1100號前"
+    lat: 23.074215
+    lon: 120.135060
+    method: 7320-twin
+    note: "7320 twin: 安明路4段1100號前"
+  - place: "臺江大道三段近安中路320巷口"
+    lat: 23.061640
+    lon: 120.170020
+    method: 7320-twin
+    note: "7320 twin: 臺江大道三段近安中路320巷口"
+  - place: "臺江大道一段與開安路口"
+    lat: 23.051445
+    lon: 120.225570
+    method: 7320-twin
+    note: "7320 twin: 臺江大道一段與開安路口"
+  - place: "公學路六段418號前"
+    lat: 23.078297
+    lon: 120.149620
+    method: 7320-twin
+    note: "7320 twin: 公學路六段418號前"
+  - place: "海尾路(路燈桿編號：131387附近)"
+    lat: 23.032488
+    lon: 120.178400
+    method: 7320-twin
+    note: "7320 twin: 海尾路(路燈桿編號：131387附近)"
+  - place: "健康路與文平路口"
+    lat: 22.983109
+    lon: 120.177190
+    method: 7320-twin
+    note: "7320 twin: 健康路與文平路口"
+  - place: "近安北路與洲安一街路口"
+    lat: 22.996902
+    lon: 120.145996
+    method: 7320-twin
+    note: "7320 twin: 近安北路與洲安一街路口"
+  - place: "安平路與華平路口"
+    lat: 22.998160
+    lon: 120.175964
+    method: 7320-twin
+    note: "7320 twin: 安平路與華平路口"
+  - place: "漁濱路與世平五路路口"
+    lat: 22.992489
+    lon: 120.145140
+    method: 7320-twin
+    note: "7320 twin: 漁濱路與世平五路路口"
+  - place: "中華北路2段80巷口"
+    lat: 23.019335
+    lon: 120.196980
+    method: 7320-twin
+    note: "7320 twin: 中華北路2段80巷口"
+  - place: "公園路-長榮路口"
+    lat: 23.013504
+    lon: 120.212030
+    method: 7320-twin
+    note: "7320 twin: 公園路-長榮路口"
+  - place: "海安路-文成路口"
+    lat: 23.012684
+    lon: 120.200386
+    method: 7320-twin
+    note: "7320 twin: 海安路-文成路口"
+  - place: "北門路與小東路口"
+    lat: 23.001534
+    lon: 120.212944
+    method: 7320-twin
+    note: "7320 twin: 北門路與小東路口"
+  - place: "新平路24號前"
+    lat: 22.964375
+    lon: 120.178720
+    method: 7320-twin
+    note: "7320 twin: 新平路24號前"
+  - place: "臺17線濱南路海口宮前"
+    lat: 22.930405
+    lon: 120.176640
+    method: 7320-twin
+    note: "7320 twin: 臺17線濱南路海口宮前"
+  - place: "永成路2段369號往南70公尺處"
+    lat: 22.945978
+    lon: 120.195490
+    method: 7320-twin
+    note: "7320 twin: 永成路2段369號往南70公尺處"
+  - place: "中華南路-近西門路口"
+    lat: 22.964825
+    lon: 120.200160
+    method: 7320-twin
+    note: "7320 twin: 中華南路-近西門路口"
+  - place: "安平港聯外道路台電高分鯤鯓54右38號電桿"
+    lat: 22.947441
+    lon: 120.174100
+    method: 7320-twin
+    note: "7320 twin: 安平港聯外道路台電高分鯤鯓54右38號電桿"
+  - place: "安平港路聯外道路-鯤鯓路127之5號前"
+    lat: 22.958733
+    lon: 120.169586
+    method: 7320-twin
+    note: "7320 twin: 安平港路聯外道路-鯤鯓路127之5號前"
+  - place: "中華南路-南和路口"
+    lat: 22.961212
+    lon: 120.189156
+    method: 7320-twin
+    note: "7320 twin: 中華南路-南和路口"
+  - place: "濱南路-鯤鯓路口"
+    lat: 22.958800
+    lon: 120.183876
+    method: 7320-twin
+    note: "7320 twin: 濱南路-鯤鯓路口"
+  - place: "金華路-永華路口"
+    lat: 22.987970
+    lon: 120.192085
+    method: 7320-twin
+    note: "7320 twin: 金華路-永華路口"
+  - place: "中華西路-新和路口"
+    lat: 22.967249
+    lon: 120.183890
+    method: 7320-twin
+    note: "7320 twin: 中華西路-新和路口"
+  - place: "中華南路-國民路口"
+    lat: 22.968900
+    lon: 120.209946
+    method: 7320-twin
+    note: "7320 twin: 中華南路-國民路口"
+  - place: "中華南路-德興路口"
+    lat: 22.961940
+    lon: 120.192530
+    method: 7320-twin
+    note: "7320 twin: 中華南路-德興路口"
+  - place: "明興路-明興路1312巷"
+    lat: 22.923483
+    lon: 120.184760
+    method: 7320-twin
+    note: "7320 twin: 明興路-明興路1312巷"
+  - place: "濱南路與喜樹路340巷口"
+    lat: 22.937895
+    lon: 120.176000
+    method: 7320-twin
+    note: "7320 twin: 濱南路與喜樹路340巷口"
+  - place: "機場路與機場路495巷口"
+    lat: 22.941513
+    lon: 120.217460
+    method: 7320-twin
+    note: "7320 twin: 機場路與機場路495巷口"
+  - place: "中華西路與府前路口路口多功能違規科技執法系統【闖紅燈、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 22.992678
+    lon: 120.186882
+    method: osm-junction
+    note: "中西區; in 中西區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中華路與中山南路口路口多功能違規科技執法系統【闖紅燈、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 23.013441
+    lon: 120.230811
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中華東路與平實路(凱旋路)口路口多功能違規科技執法系統【轉彎未依規定、違規迴轉、不停讓行人等】"
+    lat: 22.992727
+    lon: 120.234115
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "【區間平均速率執法系統】一、市道182線27.2248公里至28.358公里處(往高雄)，速限50公里，取締項目：超速，偵測長度：1133.2公尺。二、市道182線28.3378公里至27.1907公里處(往關廟)，速限50公里，取締項目：超速，偵測長度：1147.1公尺。"
+    lat: 22.950447
+    lon: 120.383260
+    method: 7320-twin
+    note: "7320 twin: 市道182線27.2248公里至28.358公里處(往高雄)；市道182線28.3378公里至27.1907公里處(往關廟)"
+  - place: "中山路與西華南街口路口多功能違規科技執法系統【闖紅燈、紅燈越線、逆向行駛、機車行駛行穿道等】"
+    lat: 22.995613
+    lon: 120.209830
+    method: osm-junction
+    note: "中西區; in 中西區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中華路與中正南路口路口多功能違規科技執法系統【闖紅燈、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 23.023595
+    lon: 120.218198
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "東豐路與林森路口路口多功能違規科技執法系統【闖紅燈、紅燈右轉、紅燈越線、未依標誌標線行駛、車輛未停讓行人、違規停車等】"
+    lat: 23.002423
+    lon: 120.224722
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=8"
+  - place: "中華路與中央路口【闖紅燈、紅燈右轉、紅燈越線、超速、未依標誌標線行駛等】"
+    lat: 23.023342
+    lon: 120.215904
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中華西路二段與民權路口【未依標誌標線行駛等】"
+    lat: 22.998910
+    lon: 120.186733
+    method: osm-junction
+    note: "中西區; in 安平區; shared-node/largest-cluster/clusters=1/nodes=4"
+  - place: "西門路與府前路口【未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 22.990431
+    lon: 120.197839
+    method: osm-junction
+    note: "中西區; in 中西區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "海安路與公園南路口【未依標誌標線行駛等】"
+    lat: 23.003835
+    lon: 120.200116
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "中華北路與文賢路口【未依標誌標線行駛、闖紅燈、超速等】"
+    lat: 23.018077
+    lon: 120.193224
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中華東路三段與崇明路口【闖紅燈、紅燈右轉、紅燈越線、超速、未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 22.974311
+    lon: 120.223147
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "長榮路與臺一線路口【闖紅燈、紅燈越線、超速、未依標誌標線行駛等】"
+    lat: 23.317580
+    lon: 120.333090
+    method: 7320-twin
+    note: "7320 twin: 長榮路與臺一線路口"
+  - place: "中華路與大橋三街口【闖紅燈、紅燈越線、紅燈右轉、未依標誌標線行駛等】"
+    lat: 23.018792
+    lon: 120.225820
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中正路與中山路口【車輛未停讓行人等】"
+    lat: 23.035936
+    lon: 120.308071
+    method: osm-junction
+    note: "新化區; in 新化區; shared-node/in-district/clusters=2/nodes=1/alts=23.06883,120.29275"
+  - place: "中山路與文德路口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛】"
+    lat: 22.972566
+    lon: 120.248227
+    method: osm-junction
+    note: "仁德區; in 仁德區; shared-node/in-district/clusters=1/nodes=3"
+  - place: "中華路與中華西街口【未依標誌標線行駛等】"
+    lat: 23.018211
+    lon: 120.226769
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "東寧路與林森路口【闖紅燈、紅燈越線、紅燈右轉、未依標誌標線行駛等】"
+    lat: 22.991126
+    lon: 120.224465
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "南門路與健康路口【闖紅燈、紅燈右轉、紅燈越線、違規停車、未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 22.981348
+    lon: 120.203715
+    method: osm-junction
+    note: "中西區; in 南區; shared-node/largest-cluster/clusters=1/nodes=2"
+  - place: "西門路與健康路口【闖紅燈、紅燈右轉、紅燈越線、違規停車等】"
+    lat: 22.981440
+    lon: 120.197663
+    method: osm-junction
+    note: "中西區; in 南區; shared-node/largest-cluster/clusters=1/nodes=4"
+  - place: "開元路與長榮路口【闖紅燈、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 23.007688
+    lon: 120.220852
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "公園路與公園南路口【未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 23.001041
+    lon: 120.208802
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "和緯路與海安路口【未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 23.011653
+    lon: 120.200597
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "中華西路與永華路口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 22.989055
+    lon: 120.186967
+    method: osm-junction
+    note: "安平區; in 中西區; shared-node/largest-cluster/clusters=1/nodes=4"
+  - place: "開元路與林森路口【未依標誌標線行駛等】"
+    lat: 23.008922
+    lon: 120.222986
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "東門路與林森路口【未依標誌標線行駛等】"
+    lat: 22.985576
+    lon: 120.222206
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=3"
+  - place: "近復興路與高速二街口【未依標誌標線行駛等】"
+    lat: 22.998604
+    lon: 120.247892
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "臺一線與新港社大道【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 23.062257
+    lon: 120.281878
+    method: osm-junction
+    note: "新市區; in 新市區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "臺19甲線(復興路)與西拉雅大道【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 23.106237
+    lon: 120.294686
+    method: osm-junction
+    note: "新市區; in 新市區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "中成路與慈音街路口【行經閃紅號誌路口未停車再開等】"
+    lat: 22.996996
+    lon: 120.205138
+    method: osm-junction
+    note: "中西區; in 中西區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "公園路1092巷與公園路1074巷17弄路口【闖紅燈】"
+    lat: 23.018799
+    lon: 120.216696
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "中華東路二段41巷與富農街二段路口【行經閃紅號誌路口未停車再開等】"
+    lat: 22.987369
+    lon: 120.235620
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "西門路和公園南路口【未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 23.002538
+    lon: 120.203409
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=5"
+  - place: "西門路和和緯路口【未依標誌標線行駛、車輛未停讓行人等】"
+    lat: 23.011481
+    lon: 120.208705
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "公園路和北安路口【未依標誌標線行駛、未停讓行人等】"
+    lat: 23.014737
+    lon: 120.213118
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "中華北路和和緯路口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛、未停讓行人等】"
+    lat: 23.006792
+    lon: 120.186269
+    method: osm-junction
+    note: "北區; in 中西區; shared-node/largest-cluster/clusters=1/nodes=4"
+  - place: "安平區永華路二段和建平路口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛、未停讓行人等】"
+    lat: 22.989624
+    lon: 120.182527
+    method: osm-junction
+    note: "安平區; in 安平區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "東區林森路和崇善路口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛、未停讓行人等】"
+    lat: 22.983450
+    lon: 120.219930
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "東區東門路和崇學路口【闖紅燈、紅燈右轉、紅燈越線、未依標誌標線行駛、未停讓行人等】"
+    lat: 22.983300
+    lon: 120.226516
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "中山路與中正路三段路口【未依標誌標線行駛、未停讓行人等】"
+    lat: 22.971623
+    lon: 120.251679
+    method: osm-junction
+    note: "仁德區; in 仁德區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "崑大路與大灣路口【超速、未依標誌標線行駛、未停讓行人等】"
+    lat: 22.998565
+    lon: 120.251745
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "中正北路與王行路口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 23.053633
+    lon: 120.271357
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "樹谷大道與紫楝路(王甲路)口【闖紅燈、超速、紅燈右轉、紅燈越線、未依標誌標線行駛等】"
+    lat: 23.101491
+    lon: 120.260163
+    method: osm-junction
+    note: "新市區; in 新市區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "西門路與民權路口【未依標誌標線行駛、未停讓行人等】"
+    lat: 22.996066
+    lon: 120.199617
+    method: osm-junction
+    note: "中西區; in 中西區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "金華路與大成路口【未依標誌標線行駛、未停讓行人等】"
+    lat: 22.974898
+    lon: 120.191010
+    method: osm-junction
+    note: "南區; in 南區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "東豐路與長榮路口【闖紅燈、超速、未依標誌標線行駛、不停讓行人等】"
+    lat: 23.002753
+    lon: 120.222498
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=8"
+  - place: "公園路與和緯路【未依標誌標線行駛、不停讓行人等】"
+    lat: 23.010655
+    lon: 120.210865
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "小東路與勝利路口【闖紅燈、超速、未依標誌標線行駛、不停讓行人、違規迴轉等】"
+    lat: 23.000945
+    lon: 120.218576
+    method: osm-junction
+    note: "北區; in 東區; shared-node/largest-cluster/clusters=1/nodes=2"
+  - place: "西門路與北安路口【闖紅燈、超速、未依標誌標線行駛、不停讓行人等】"
+    lat: 23.016317
+    lon: 120.210757
+    method: osm-junction
+    note: "北區; in 北區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "復興路與高速一街二段口【闖紅燈、超速、未依標誌標線行駛等】"
+    lat: 22.998603
+    lon: 120.248472
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中正北路與永安路口【闖紅燈、超速、未依標誌標線行駛等】"
+    lat: 23.041719
+    lon: 120.246638
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "永安路與仁愛街口【闖紅燈、超速、未依標誌標線行駛等】"
+    lat: 23.048931
+    lon: 120.241328
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=1"
+  - place: "中正南(北)路與中正路口【闖紅燈、超速、未依標誌標線行駛、不停讓行人等】"
+    lat: 23.041218
+    lon: 120.237407
+    method: osm-junction
+    note: "永康區; in 永康區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "大成路與國民路口【闖紅燈、超速、未依標誌標線行駛等】"
+    lat: 22.975209
+    lon: 120.203946
+    method: osm-junction
+    note: "南區; in 南區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "金華路與健康路口【未依標誌標線行駛、不停讓行人、違規停車等】"
+    lat: 22.981552
+    lon: 120.191548
+    method: osm-junction
+    note: "南區; in 南區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "中華西路與新興路口【闖紅燈、超速、未依標誌標線行駛、不停讓行人等】"
+    lat: 22.973235
+    lon: 120.183804
+    method: osm-junction
+    note: "南區; in 南區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "長和路與永安橋路口【闖紅燈、超速、未依標誌標線行駛等】"
+    lat: 23.052388
+    lon: 120.238697
+    method: osm-junction
+    note: "安南區; in 安南區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "北安路與怡安路口【闖紅燈、超速、未依標誌標線行駛等】"
+    lat: 23.042857
+    lon: 120.203441
+    method: osm-junction
+    note: "安南區; in 安南區; shared-node/in-district/clusters=1/nodes=4"
+  - place: "北安路與長溪路口【闖紅燈、超速等】"
+    lat: 23.043244
+    lon: 120.203917
+    method: osm-junction
+    note: "安南區; in 安南區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "東門路與自由路口【闖紅燈、超速、未依標誌標線行駛等】"
+    lat: 22.975866
+    lon: 120.237416
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "大同路與國民路口【闖紅燈、超速、未依標誌標線行駛、不停讓行人等】"
+    lat: 22.967481
+    lon: 120.215855
+    method: osm-junction
+    note: "東區; in 東區; shared-node/in-district/clusters=1/nodes=3"
+  - place: "歸仁圓環（與中山路段交織之行人穿越道）【不停讓行人等】"
+    lat: 22.966746
+    lon: 120.294299
+    method: osm-junction
+    note: "歸仁區; in 歸仁區; single-way/1 ways"
+  - place: "永華路與夏林路口【不停讓行人等】"
+    lat: 22.987547
+    lon: 120.194893
+    method: osm-junction
+    note: "南區; in 南區; shared-node/in-district/clusters=1/nodes=2"
+  - place: "臺19甲線21.5公里處"
+    lat: 23.154694
+    lon: 120.285706
+    method: manual
+    note: "善化區; the national list has the same pole as 臺19甲線21.3公里處 (0.2 km labelling difference) — reused so the row dedupes onto it"

@@ -49,6 +49,7 @@ from .parse import (
     SOURCE_38357,
     SOURCE_100855,
     SOURCE_164507,
+    SOURCE_53645,
     SOURCE_ELAND_FIXED,
     SOURCE_ELAND_TECH,
     parse_130111,
@@ -83,6 +84,7 @@ from .parse import (
     parse_38357,
     parse_100855,
     parse_164507,
+    parse_53645,
     parse_eland_fixed,
     parse_eland_tech,
 )
@@ -125,6 +127,7 @@ DATASETS = (
     (164507, parse_164507, SOURCE_164507),
     (83881, parse_83881, SOURCE_83881),
     (170673, parse_170673, SOURCE_170673),
+    (53645, parse_53645, SOURCE_53645),
     (176549, parse_176549, SOURCE_176549),
     (176558, parse_176558, SOURCE_176558),
     (176560, parse_176560, SOURCE_176560),

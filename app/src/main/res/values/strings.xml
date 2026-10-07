@@ -111,7 +111,7 @@
     <string name="about_attribution_title">Data attribution</string>
     <string name="about_attribution_body">Camera locations come from Taiwanese government open data (data.gov.tw) and county open-data portals, released under the Open Government Data License v1.0 (政府資料開放授權條款—第1版). Dataset ids: %1$s. Portals: %2$s.</string>
     <!-- Every dataset the pipeline ingests (pipeline/src/twsp_pipeline/cli.py DATASETS); a pipeline test keeps this in sync. -->
-    <string name="about_attribution_datasets" translatable="false">7320, 13940, 100856, 130111, 25935, 178168, 135957, 170673, 176549, 176558, 176560, 176561, 176555, 177827, 172905, 178085, 178086, 178159, 156415, 172940, 172174, 159972, 178144, 178121, 83881, 27969, 109336, 173211, 178734, 38357, 100855, 126156, 164507</string>
+    <string name="about_attribution_datasets" translatable="false">7320, 13940, 100856, 130111, 25935, 178168, 135957, 170673, 176549, 176558, 176560, 176561, 176555, 177827, 172905, 178085, 178086, 178159, 156415, 172940, 172174, 159972, 178144, 178121, 83881, 27969, 109336, 173211, 178734, 38357, 100855, 126156, 164507, 53645</string>
     <string name="about_attribution_portals" translatable="false">opendata.e-land.gov.tw</string>
     <string name="about_data_license">View the data license</string>
     <string name="about_code_title">Code and map</string>
