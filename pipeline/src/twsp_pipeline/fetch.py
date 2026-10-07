@@ -48,13 +48,18 @@ class _DeadlineExceeded(Exception):
 # intermediate into the store lets OpenSSL complete the chain. Trust still
 # rests on the certifi root: the file was chain-verified against it when
 # bundled and expires 2030-10-16.
-_EXTRA_CA_BUNDLE = Path(__file__).with_name("certs") / "twca-secure-ssl-ca.pem"
+# Every *.pem in certs/ is an intermediate some .gov.tw host omits (the header
+# of each file names the host and the chain verification); the leaf's AIA
+# CA-Issuers URL is where a new one comes from when a host renews under a
+# different sub-CA (odws.hccg.gov.tw did in 2026-10).
+_EXTRA_CA_DIR = Path(__file__).with_name("certs")
 
 
 def _ssl_context() -> ssl.SSLContext:
     ctx = ssl.create_default_context(cafile=certifi.where())
     ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
-    ctx.load_verify_locations(cafile=str(_EXTRA_CA_BUNDLE))
+    for bundle in sorted(_EXTRA_CA_DIR.glob("*.pem")):
+        ctx.load_verify_locations(cafile=str(bundle))
     return ctx
 
 
