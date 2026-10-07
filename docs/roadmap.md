@@ -166,6 +166,17 @@ only negotiate legacy TLS (1 new point — not worth a security downgrade), and
 the police list has no coordinates). The watch now runs the title search on
 every monthly pass, so the export blind spot is closed.
 
+New Taipei's 區間 dataset 126156 (14 zones, both gantries per direction with
+official lengths) was curated in full the same week: 24 sections (北宜公路 ×3
+both ways, 台2 ×4 both ways, 台64 ×4, 台65, 台7乙, 環河路, 壽山路). Checksum
+per entry: the OSRM road walk between the two given gantries is within 0.3–2 %
+of the official length, and the gantry bearings are the local road direction
+over the first/last 120 m of that walk (on 北宜's hairpins they sit up to 70°
+off the chord). 台65 is the exception — OSRM leaves the elevated expressway,
+so its bearings come from the northbound OSM carriageway tangents and its
+length is checked against the chord only. The 13 national 「A至B」 point rows
+along these zones are suppressed as before. Sections total 19 → 43.
+
 Upstream monitoring is automated: the monthly `dataset-watch` workflow diffs
 the data.gov.tw catalog against `pipeline/data/dataset_watch.yaml`, checks
 that used datasets still resolve, re-checks coordinate-less ones (Tainan

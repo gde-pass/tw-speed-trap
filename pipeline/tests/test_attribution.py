@@ -1,12 +1,16 @@
 """The in-app attribution must credit every dataset the pipeline ingests
-(Open Government Data License v1.0 requires source attribution)."""
+(Open Government Data License v1.0 requires source attribution) — the parsed
+sources in cli.DATASETS and every data.gov.tw dataset the curated sections
+cite as their source."""
 
 import re
 from pathlib import Path
 
 from twsp_pipeline.cli import DATASETS
 
-STRINGS = Path(__file__).resolve().parents[2] / "app/src/main/res/values/strings.xml"
+ROOT = Path(__file__).resolve().parents[2]
+STRINGS = ROOT / "app/src/main/res/values/strings.xml"
+SECTIONS = ROOT / "pipeline/data/sections.yaml"
 
 
 def test_about_screen_lists_every_ingested_dataset():
@@ -15,4 +19,7 @@ def test_about_screen_lists_every_ingested_dataset():
     assert match, "about_attribution_datasets string missing"
     credited = {int(x) for x in re.findall(r"\d+", match.group(1))}
     ingested = {dataset_id for dataset_id, _, _ in DATASETS}
-    assert credited == ingested, f"missing={ingested - credited} extra={credited - ingested}"
+    sections_yaml = SECTIONS.read_text(encoding="utf-8")
+    cited = {int(x) for x in re.findall(r'^\s+source: "https://data\.gov\.tw/dataset/(\d+)"', sections_yaml, re.M)}
+    expected = ingested | cited
+    assert credited == expected, f"missing={expected - credited} extra={credited - expected}"
