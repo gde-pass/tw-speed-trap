@@ -8,6 +8,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .curated import load_curated_points
 from .decode import decode_bytes
 from .dedupe import collapse_id_duplicates, dedupe
 from .emit import write_geojson, write_manifest, write_sqlite, write_unresolved
@@ -230,6 +231,12 @@ def main(argv: list[str] | None = None) -> int:
         help="township boundaries for the district sanity check (tools/build_districts.py)",
     )
     parser.add_argument(
+        "--curated-points",
+        type=Path,
+        default=Path("pipeline/data/curated_points.yaml"),
+        help="cameras transcribed from non-machine-readable lists (see the file's header)",
+    )
+    parser.add_argument(
         "--overrides",
         type=Path,
         default=Path("pipeline/data/overrides.yaml"),
@@ -272,6 +279,18 @@ def main(argv: list[str] | None = None) -> int:
             all_unresolved.extend(unresolved)
             stats.update(source_stats)
 
+    curated_points = load_curated_points(args.curated_points, today)
+    if curated_points:
+        print(f"curated points: {len(curated_points)} cameras from {args.curated_points}")
+        all_cameras.extend(curated_points)
+    # Overrides match raw descriptions, so they run before same-device rows
+    # collapse (7320 lists 台3線111.8K and 113.5K at one coordinate: after the
+    # collapse only one description survives).
+    all_cameras, override_dropped, unmatched_overrides = apply_overrides(all_cameras, load_overrides(args.overrides))
+    if override_dropped:
+        print(f"curated overrides: dropped {sum(override_dropped.values())} rows ({dict(override_dropped)})")
+    for entry in unmatched_overrides:
+        print(f"  WARNING: override matched no row — upstream changed? {entry['source']} {entry['description']!r}")
     all_cameras, same_device = collapse_id_duplicates(all_cameras)
     if same_device:
         print(f"\nsame-device rows collapsed: {sum(same_device.values())} ({dict(same_device)})")
@@ -288,11 +307,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"district check: dropped {sum(district_dropped.values())} mislocated rows ({dict(district_dropped)})")
         for line in district_report:
             print(f"  {line}")
-    all_cameras, override_dropped, unmatched_overrides = apply_overrides(all_cameras, load_overrides(args.overrides))
-    if override_dropped:
-        print(f"curated overrides: dropped {sum(override_dropped.values())} rows ({dict(override_dropped)})")
-    for entry in unmatched_overrides:
-        print(f"  WARNING: override matched no row — upstream changed? {entry['source']} {entry['description']!r}")
     deduped, dropped = dedupe(all_cameras)
     print(f"dedupe: kept {len(deduped)}, dropped {sum(dropped.values())} ({dict(dropped)})")
 

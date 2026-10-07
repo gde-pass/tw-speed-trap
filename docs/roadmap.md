@@ -66,10 +66,15 @@ and 烏日區環中路八段599號前 all placed ~28 km west in 彰化 (福興/�
 7 km offshore, and 宜蘭's 台2線133k+769m 1 km offshore. Six more pairs where
 the same camera sits at two places >100 m apart in 7320 and 83881 are
 resolved by `data/overrides.yaml` with reverse-geocoding evidence (the
-dropped copy is on another road); 24 same-description pairs 100–2800 m
-apart on the *same* road remain undecidable from data alone — the
-gantry-marking ride test below is the way to settle them. All worth
-reporting to 警政署 / 臺中市警察局.
+dropped copy is on another road). Junction descriptions (「A路與B路口」)
+are settled against the OSM junction itself (v1.5.8): seven more phantom
+copies dropped, and for 五權南路×忠明南路, 西屯路三段×遠東街 and 圓環北路一段×豐洲路
+both the national and the city list are 0.8–6 km off, so the camera is
+re-created at the junction (`curated_points.yaml`). What remains
+undecidable from data alone are same-road km-marker pairs 1–3 km apart
+(苗栗 台3 121.9K, 雲林 台3 248.97K, 臺中 向上路六段 中136 10.2K, 中清路七段 台10
+5.5K …) — the gantry-marking ride test below is the way to settle them.
+All worth reporting to 警政署 / 臺中市警察局.
 
 ## CI: bot data commits skip CI
 

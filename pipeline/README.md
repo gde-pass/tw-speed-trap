@@ -90,6 +90,17 @@ moving rider.
 Everything dropped is counted in the build report and written to
 `unresolved.csv` — never silently.
 
+### Curated points
+
+`data/curated_points.yaml` holds cameras transcribed from lists that are
+not machine-readable (花蓮's PDF, data.gov.tw 177297: nine junctions placed
+at their OSM node) and the few junctions where every source has the
+position wrong (three Taichung junctions re-created at the OSM junction,
+their wrong copies dropped by `overrides.yaml`). Every entry names its
+source, edition and method; `curated.py` turns them into cameras with the
+source `curated:points.yaml`, and they pass through the same district check
+and dedupe as parsed rows.
+
 ### Geocoding a text-only list
 
 `data/geocodes/<id>.yaml` holds hand-verified coordinates for a dataset

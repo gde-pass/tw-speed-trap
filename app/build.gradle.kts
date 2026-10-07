@@ -6,7 +6,7 @@ plugins {
 
 // Single source of truth for the app version. Bump this before tagging
 // vX.Y.Z — the release workflow refuses tags that don't match it.
-val appVersion = "1.5.7"
+val appVersion = "1.5.8"
 
 android {
     namespace = "io.github.gdepass.twspeedtrap"

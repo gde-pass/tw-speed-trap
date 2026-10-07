@@ -44,6 +44,7 @@ used:
   38357: 南投縣政府警察局固定式自動測速照相桿
   100855: 國道公路警察局交流道區重點違規錄影地點
   53645: 臺南市固定式交通違規照相設備設置地點  # text locations only — coordinates come from the curated table pipeline/data/geocodes/53645.yaml (OSM junction geocoding + 7320 twins); a new upstream row shows up as "geocode missing" in the build report (2026-10)
+  177297: 花蓮縣警察局測速照相、闖紅燈照相固定桿及科技執法設置地點一覽表  # PDF (114年度 edition) transcribed into pipeline/data/curated_points.yaml — 9 junctions geocoded from OSM; re-transcribe when a new edition appears (2026-10)
   164507: 路口安全自動偵測系統設置地點  # 新北市 intersection tech enforcement (闖紅燈/不停讓行人/…), 110 rows with coordinates; surfaced by the title-search terms 偵測/設置地點 (2026-10)
 
 # County portals that data.gov.tw does not index: fetched by URL (cli.DIRECT
@@ -247,7 +248,6 @@ seen:
   176676: 1150129雲林縣警察局固定式測速照相設備設置地點一覽表  # superseded Yunlin edition (1150129), header-less file (2026-09)
   176764: 1150209雲林縣警察局固定式測速照相設備設置地點一覽表
   177151: 臺東縣警察局115年「固定式取締違規照相桿暨科技執法偵測」設置地點公告
-  177297: 花蓮縣警察局測速照相、闖紅燈照相固定桿及科技執法設置地點一覽表  # PDF only (2026-09)
   177468: 1150422雲林縣警察局固定式測速照相設備設置地點一覽表
   177486: 臺東縣警察局115年「固定式取締違規照相桿暨科技執法偵測」設置地點公告1150424
   177925: 1150706雲林縣警察局固定式測速照相設備設置地點一覽表

@@ -33,3 +33,58 @@ drop:
     description: 霧峰區環河路一段近638號
     keep: gov.tw:7320
     evidence: 83881 point (24.07509,120.69996) is on 中正路 in 霧峰, 4317 m east; 7320 (24.08532,120.65899) is on 環河路一段 (filed as 大里區 / 環河路一段638號).
+  - source: gov.tw:7320
+    description: 建國北路農安街口
+    keep: gov.tw:130111
+    evidence: 7320 point (25.05473,121.52277) is on 中山北路二段, 1.8 km south-west of 建國北路×農安街; 130111 (25.06500,121.53657) sits at the junction under the 建國高架 民權東路 ramp.
+  - source: gov.tw:7320
+    description: 台3線111.8公里處
+    keep: gov.tw:172174
+    evidence: 7320 gives the same coordinate (24.52958,120.91647) for 台3線111.8公里 and 113.5公里 — two markers 1.7 km apart; 172174's two points (24.55639,120.92737 / 24.54220,120.92175) are 1.7 km apart along 中豐公路 as the markers require.
+  - source: gov.tw:7320
+    description: 台3線113.5公里處
+    keep: gov.tw:172174
+    evidence: see 台3線111.8公里處 — the national list repeats one coordinate for both markers; 172174 places 113.5K at (24.54220,120.92175).
+  # Settled by the OSM junction of the two named roads (Geofabrik Taiwan extract,
+  # 2026-10): the kept copy sits within 70 m of the junction, the dropped one does not.
+  - source: gov.tw:7320
+    description: 鳳頂路與過埤路口
+    keep: gov.tw:176549
+    evidence: junction 鳳頂路×過埤路 is at (22.59026,120.35890); 7320's point is 398 m away, 176549's 38 m.
+  - source: gov.tw:7320
+    description: 旗山區中華路與延平一路口
+    keep: gov.tw:176549
+    evidence: junction at (22.88222,120.48483); 7320's point (22.89214,120.48338) is 1114 m north on 延平一路, 176549's 63 m.
+  - source: gov.tw:83881
+    description: 豐原區豐原大道與西勢路口
+    keep: gov.tw:7320
+    evidence: junction at (24.23829,120.70335); 83881's point (24.24632,120.71133) is 1207 m away, 7320's 29 m.
+  - source: gov.tw:83881
+    description: 豐原區中山路與豐原大道路口
+    keep: gov.tw:7320
+    evidence: junction at (24.23718,120.71045); 83881's point (24.24499,120.71440) is 958 m away, 7320's 12 m.
+  # Both sources wrong: the camera is re-created at the junction in curated_points.yaml.
+  - source: gov.tw:7320
+    description: 南區五權南路與忠明南路口
+    keep: curated:points.yaml
+    evidence: junction 五權南路×忠明南路 at (24.11910,120.67004); 7320 is 844 m away (on 工學北路), 83881 1209 m (on 復興路一段).
+  - source: gov.tw:83881
+    description: 南區五權南路與忠明南路口
+    keep: curated:points.yaml
+    evidence: see the 7320 entry above.
+  - source: gov.tw:7320
+    description: 西屯區西屯路三段與遠東街口
+    keep: curated:points.yaml
+    evidence: junction 西屯路三段×遠東街 at (24.19157,120.59743); 7320 is 2083 m away (工業區), 83881 6000 m (中科路).
+  - source: gov.tw:83881
+    description: 西屯區西屯路三段與遠東街口
+    keep: curated:points.yaml
+    evidence: see the 7320 entry above.
+  - source: gov.tw:7320
+    description: 豐原區圓環北路一段與豐洲路口
+    keep: curated:points.yaml
+    evidence: junction 圓環北路一段×豐洲路 at (24.25618,120.71523); 7320 is 979 m away (東北街), 83881 2029 m (豐原大道四段).
+  - source: gov.tw:83881
+    description: 豐原區圓環北路一段與豐洲路口
+    keep: curated:points.yaml
+    evidence: see the 7320 entry above.

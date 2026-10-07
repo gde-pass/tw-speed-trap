@@ -1,0 +1,110 @@
+# Cameras transcribed from lists that are not machine-readable, or placed by
+# hand where every source has the position wrong. Each entry carries its
+# provenance (source dataset, edition) and its method, so it can be re-checked
+# when the agency publishes a new edition. Loaded by twsp_pipeline/curated.py
+# as source "curated:points.yaml"; type is fixed / red_light / tech, direction
+# is the enforced direction of travel in the datasets' own words (北向南 =
+# southbound), empty = both directions.
+#
+# 花蓮 177297 — 花蓮縣警察局114年度測速照相、闖紅燈照相固定桿及科技執法設置地點一覽表
+#   (PDF). 43 speed/red-light rows; 31 already in the national list, 3 km-marker
+#   poles not placeable without 省道 km posts (臺9線179.2K, 臺9丙線7K, 臺11線43.95K),
+#   the 9 junctions below placed at the shared OSM node of the named roads.
+points:
+  - place: "花蓮市府前路與北興路口（南下）"
+    city: 花蓮縣
+    type: red_light
+    direction: 北向南
+    speed_limit: 60
+    lat: 24.006233
+    lon: 121.618328
+    items: "闖紅燈及未依標誌標線號誌"
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/177297"
+    note: "114年度 PDF, fetched 2026-10-08"
+  - place: "花蓮縣臺9線與新城鄉嘉里二路口（南下）"
+    city: 花蓮縣
+    type: red_light
+    direction: 北向南
+    speed_limit: 70
+    lat: 24.018688
+    lon: 121.609785
+    items: "闖紅燈及未依標誌標線號誌"
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/177297"
+    note: "114年度 PDF, fetched 2026-10-08"
+  - place: "花蓮市中山路與建國路口"
+    city: 花蓮縣
+    type: red_light
+    lat: 23.983253
+    lon: 121.604487
+    items: "闖紅燈、機車未依規定兩段式左轉及未依標誌標線號誌"
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/177297"
+    note: "114年度 PDF, fetched 2026-10-08"
+  - place: "花蓮市中山路與富安路口"
+    city: 花蓮縣
+    type: red_light
+    lat: 23.992054
+    lon: 121.597662
+    items: "闖紅燈、機車未依規定兩段式左轉及未依標誌標線號誌"
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/177297"
+    note: "114年度 PDF, fetched 2026-10-08"
+  - place: "花蓮市中山路、軒轅路、花崗街及重慶路口"
+    city: 花蓮縣
+    type: red_light
+    lat: 23.974157
+    lon: 121.611541
+    items: "闖紅燈、未停讓行人及未依標誌標線號誌"
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/177297"
+    note: "114年度 PDF, fetched 2026-10-08"
+  - place: "花蓮市中正路與明禮路口"
+    city: 花蓮縣
+    type: red_light
+    lat: 23.979453
+    lon: 121.610691
+    items: "闖紅燈、機車未依規定兩段式左轉及未依標誌標線號誌"
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/177297"
+    note: "114年度 PDF, fetched 2026-10-08"
+  - place: "花蓮市南濱路與和平路口"
+    city: 花蓮縣
+    type: red_light
+    lat: 23.967053
+    lon: 121.608873
+    items: "闖紅燈、機車未依規定兩段式左轉及未停讓行人"
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/177297"
+    note: "114年度 PDF, fetched 2026-10-08"
+  - place: "南區五權南路與忠明南路口"
+    city: 臺中市
+    type: fixed
+    direction: 西向東
+    speed_limit: 50
+    lat: 24.119101
+    lon: 120.670041
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/83881"
+    note: "both 7320 and 83881 place this junction camera 0.8–6 km from the junction (see overrides.yaml); the OSM junction is the only consistent position"
+  - place: "西屯區西屯路三段與遠東街口"
+    city: 臺中市
+    type: fixed
+    direction: 南向北
+    speed_limit: 50
+    lat: 24.191572
+    lon: 120.597426
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/83881"
+    note: "both 7320 and 83881 place this junction camera 0.8–6 km from the junction (see overrides.yaml); the OSM junction is the only consistent position"
+  - place: "豐原區圓環北路一段與豐洲路口"
+    city: 臺中市
+    type: fixed
+    direction: 南向北
+    speed_limit: 50
+    lat: 24.256177
+    lon: 120.715227
+    method: "osm-junction (shared-node/in-district/clusters=1)"
+    source: "https://data.gov.tw/dataset/83881"
+    note: "both 7320 and 83881 place this junction camera 0.8–6 km from the junction (see overrides.yaml); the OSM junction is the only consistent position"
